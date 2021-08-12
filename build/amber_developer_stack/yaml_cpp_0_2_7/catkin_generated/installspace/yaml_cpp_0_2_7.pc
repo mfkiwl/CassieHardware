@@ -1,0 +1,8 @@
+prefix=/home/xiaobin/cassie_ws/install
+
+Name: yaml_cpp_0_2_7
+Description: Description of yaml_cpp_0_2_7
+Version: 0.2.7
+Cflags: -I${prefix}/include
+Libs: -L${prefix}/lib -lyaml-cpp-0.2.7
+Requires: 

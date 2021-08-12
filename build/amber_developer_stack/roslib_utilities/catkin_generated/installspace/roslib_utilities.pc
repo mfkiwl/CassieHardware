@@ -1,0 +1,8 @@
+prefix=/home/xiaobin/cassie_ws/install
+
+Name: roslib_utilities
+Description: Description of roslib_utilities
+Version: 0.0.0
+Cflags: -I${prefix}/include
+Libs: -L${prefix}/lib -lroslib_utilities
+Requires: roslib rospack

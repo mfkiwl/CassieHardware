@@ -1,0 +1,8 @@
+prefix=/home/xiaobin/cassie_ws/install
+
+Name: qpoases_ros
+Description: Description of qpoases_ros
+Version: 0.0.0
+Cflags: -I${prefix}/include
+Libs: -L${prefix}/lib -lqpoases_ros
+Requires: 

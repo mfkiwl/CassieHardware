@@ -1,0 +1,7 @@
+set(gdb_utilities_SETUP_PY_SETUP_MODULE "distutils.core")
+set(gdb_utilities_SETUP_PY_VERSION "0.0.0")
+set(gdb_utilities_SETUP_PY_SCRIPTS "")
+set(gdb_utilities_SETUP_PY_PACKAGES "gdb_utilities")
+set(gdb_utilities_SETUP_PY_PACKAGE_DIRS "src/gdb_utilities")
+set(gdb_utilities_SETUP_PY_MODULES "")
+set(gdb_utilities_SETUP_PY_MODULE_DIRS "")

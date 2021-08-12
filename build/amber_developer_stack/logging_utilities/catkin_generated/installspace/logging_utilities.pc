@@ -1,0 +1,8 @@
+prefix=/home/xiaobin/cassie_ws/install
+
+Name: logging_utilities
+Description: Description of logging_utilities
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

@@ -1,0 +1,8 @@
+prefix=/home/xiaobin/cassie_ws/install
+
+Name: alt_math_utilities
+Description: Description of alt_math_utilities
+Version: 0.0.0
+Cflags: -I${prefix}/include
+Libs: -L${prefix}/lib -lalt_math_utilities
+Requires: 

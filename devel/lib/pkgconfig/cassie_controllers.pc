@@ -1,0 +1,8 @@
+prefix=/home/xiaobin/cassie_ws/devel
+
+Name: cassie_controllers
+Description: Description of cassie_controllers
+Version: 0.0.0
+Cflags: -I/home/xiaobin/cassie_ws/src/cassie_controllers/include
+Libs: -L${prefix}/lib -lcassie_controllers
+Requires: roscpp rospy std_srvs ros_utilities eigen_utilities control_utilities cassie_common_toolbox realtime_utilities roslib_utilities qpoases_ros

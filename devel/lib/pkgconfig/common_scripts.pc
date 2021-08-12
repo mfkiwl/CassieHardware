@@ -1,0 +1,8 @@
+prefix=/home/xiaobin/cassie_ws/devel
+
+Name: common_scripts
+Description: Description of common_scripts
+Version: 0.1.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

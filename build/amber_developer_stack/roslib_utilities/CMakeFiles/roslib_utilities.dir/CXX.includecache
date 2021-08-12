@@ -1,0 +1,28 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/xiaobin/cassie_ws/src/amber_developer_stack/roslib_utilities/include/roslib_utilities/ros_package_utilities.hpp
+boost/filesystem.hpp
+-
+
+/home/xiaobin/cassie_ws/src/amber_developer_stack/roslib_utilities/src/ros_package_utilities.cpp
+ros/package.h
+-
+roslib_utilities/ros_package_utilities.hpp
+/home/xiaobin/cassie_ws/src/amber_developer_stack/roslib_utilities/src/roslib_utilities/ros_package_utilities.hpp
+
+/opt/ros/melodic/include/ros/package.h
+string
+-
+utility
+-
+vector
+-
+map
+-
+

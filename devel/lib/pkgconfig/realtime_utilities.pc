@@ -1,0 +1,8 @@
+prefix=/home/xiaobin/cassie_ws/devel
+
+Name: realtime_utilities
+Description: Description of realtime_utilities
+Version: 0.0.0
+Cflags: -I/home/xiaobin/cassie_ws/src/amber_developer_stack/realtime_utilities/include
+Libs: -L${prefix}/lib -lrealtime_utilities -lrt
+Requires: 

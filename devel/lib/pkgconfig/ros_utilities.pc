@@ -1,0 +1,8 @@
+prefix=/home/xiaobin/cassie_ws/devel
+
+Name: ros_utilities
+Description: Description of ros_utilities
+Version: 0.0.0
+Cflags: -I/home/xiaobin/cassie_ws/src/amber_developer_stack/ros_utilities/include
+Libs: -L${prefix}/lib 
+Requires: yaml_eigen_utilities

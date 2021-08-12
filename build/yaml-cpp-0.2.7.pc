@@ -1,0 +1,11 @@
+prefix=/home/xiaobin/cassie_ws/install
+exec_prefix=/home/xiaobin/cassie_ws/install
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: Yaml-cpp
+Description: A YAML parser and emitter for C++
+Version: 0.2.7
+Requires:
+Libs: -L${libdir} -lyaml-cpp-0.2.7
+Cflags: -I${includedir}
