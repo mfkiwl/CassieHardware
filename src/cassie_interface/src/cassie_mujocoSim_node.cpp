@@ -39,7 +39,17 @@ cassie_common_toolbox::cassie_proprioception_msg proprioception_msg;
 
 static cassie_user_in_t cassie_user_in = {0};
 static cassie_out_t cassie_out;
-static VectorXd u(10); // Variable for control
+
+static long long get_microseconds(void)
+{
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return now.tv_sec * 1000000 + now.tv_nsec / 1000;
+}
+///////////////////////////////////////////////////
+
+// Variable for control
+static VectorXd u(10);
 static ros_utilities::Timer timeout_timer(true);
 static ros_utilities::Timer estimation_realtime_timer(true);
 
@@ -58,19 +68,13 @@ void processProprioception_msg(cassie_out_t &cassie_out);
 // Main node
 int main(int argc, char *argv[])
 {
+    ///////////////////////// CONFIG ///////////////////////////
     // Establish the current ROS node and associated timing
     ros::init(argc, argv, "cassie_interface");
     ros::NodeHandle nh("/cassie/interface");
 
-    // Setup ROS publisher/subscriber networks
-    ros::Publisher proprioception_pub = nh.advertise<cassie_common_toolbox::cassie_proprioception_msg>("/cassie_proprioception", 1);
-    ros::Subscriber controller_sub = nh.subscribe("/cassie_control", 1, controller_callback, ros::TransportHints().tcpNoDelay(true));
-
-    //////////////////////////////////////////  read parameters /////////////////////////////////////////////////
-
     // Check if the simulated joystick command is enabled!
-    bool isSim = false;
-    ros::param::get("/cassie/is_simulation", isSim);
+    bool isSim = true;
     timeout_timer.start();
     estimation_realtime_timer.start();
 
@@ -83,49 +87,32 @@ int main(int argc, char *argv[])
     ros::param::get("/cassie/interface/safe_torque_limit", stl);
     yaml_utilities::yaml_read_string(stl, safe_torque_limit);
     std::cout << "Using safe torque limit: " << safe_torque_limit.transpose() << std::endl;
-    /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    //////////////////////////////////////////  UDP communication /////////////////////////////////////////////////
+    //////////////////////// Mujoco Setup /////////////////////////////////////////////////
+    bool visualize = true;
+    bool hold = false;
 
-    // communication
-    std::string remote_addr_str, remote_port_str, iface_addr_str, iface_port_str;
-    ROS_INFO("Using a hardware environment... Connecting to Cassie network");
-    remote_addr_str = "10.10.10.3";
-    remote_port_str = "25000";
-    iface_addr_str = "10.10.10.105";
-    iface_port_str = "25001";
+    ROS_INFO("Using Mujoco Simulator");
+    // Create cassie simulation
+    const char modelfile[] = "/home/xiaobin/cassie_ws/src/cassie_interface/model/cassie.xml";
+    cassie_sim_t *sim = cassie_sim_init(modelfile, false);
+    cassie_vis_t *vis;
+    if (visualize)
+        vis = cassie_vis_init(sim, modelfile, false);
+    if (hold)
+        cassie_sim_hold(sim);
 
+    // Manage simulation loop
+    unsigned long long loop_counter = 0;
 
-    // Bind to network interface std::cout << "Bind to network at: " << (const char *)remote_addr_str.c_str() << std::endl;
-    int sock = udp_init_client(remote_addr_str.c_str(), remote_port_str.c_str(), iface_addr_str.c_str(), iface_port_str.c_str());
-    if (-1 == sock)
-        exit(EXIT_FAILURE);
-
-  
-    // Create packet input/output buffers
-    const int dinlen = CASSIE_OUT_T_PACKED_LEN;
-    const int doutlen = CASSIE_USER_IN_T_PACKED_LEN;
-    const int recvlen = PACKET_HEADER_LEN + dinlen;
-    const int sendlen = PACKET_HEADER_LEN + doutlen;
-    unsigned char *recvbuf = new unsigned char[recvlen];
-    unsigned char *sendbuf = new unsigned char[sendlen];
-
-    // Separate input/output buffers into header and payload
-    const unsigned char *header_in = recvbuf;
-    const unsigned char *data_in = &recvbuf[PACKET_HEADER_LEN];
-    unsigned char *header_out = sendbuf;
-    unsigned char *data_out = &sendbuf[PACKET_HEADER_LEN];
-
-    // Create header information struct
-    packet_header_info_t header_info = {0};
-
-    memset(sendbuf, 0, sendlen);
-    bool received_data = false;
+    ////////////////////////////////////////////////////////////////////////////////////
+    // Setup ROS publisher/subscriber networks
+    ros::Publisher proprioception_pub = nh.advertise<cassie_common_toolbox::cassie_proprioception_msg>("/cassie_proprioception", 1);
+    ros::Subscriber controller_sub = nh.subscribe("/cassie_control", 1, controller_callback, ros::TransportHints().tcpNoDelay(true));
 
     // Prepare initial null command packet to start communication
     printf("Running the interface node...\n");
 
-    //////////////////////////// robot process ////////////////////////////////////
     // Run our own characterization of the shin and heel spring offsets
     cassie_model::Cassie robot;
     ContactClassifier contact(nh, robot, 0.0005);
@@ -145,14 +132,12 @@ int main(int argc, char *argv[])
         logfile.open(path, std::ios::out | std::ios::binary);
     }
 
-    /////////////////////////////////////////////////////////////////////////////////////////////
     // Listen/respond loop
     while (ros::ok())
     {
         // Spin ROS once to get updated control values
         ros::spinOnce();
 
-        /////////////////////////// process  controller and send  ////////////////////////////////
         // Check the timeout and see if the torque must be zeroed
         if (timeout_timer.elapsed() > 0.01) // seconds
         {
@@ -163,45 +148,24 @@ int main(int argc, char *argv[])
         {
             control_eigen_utilities::clamp(u, -safe_torque_limit, safe_torque_limit); // Apply saturation
         }
-
+        // process controller and send
         for (unsigned int i = 0; i < 10; i++)
         {
             cassie_user_in.torque[i] = u[i];
         }
 
-        ///////////////////////////////  receive and send ///////////////////////////////////
-        if (!received_data)
+        ///////////////////////////////  receive ///////////////////////////////////
+        // Draw no more then once every 33 simulation steps
+        if (visualize && loop_counter % 33 == 0)
+            cassie_vis_draw(vis, sim);
+        // Increment loop counter
+        ++loop_counter;
+        if (!cassie_vis_paused(vis))
         {
-            // Send null commands until the simulator responds
-            ssize_t nbytes;
-            do
-            {
-                send_packet(sock, sendbuf, sendlen, nullptr, 0);
-                usleep(1000);
-                nbytes = get_newest_packet(sock, recvbuf, recvlen, nullptr, nullptr);
-            } while (recvlen != nbytes);
-            received_data = true;
-            printf("Connected!\n\n");
+            cassie_sim_step(sim, &cassie_out, &cassie_user_in);
         }
-        else
-        {
-            // Wait for a new packet
-            wait_for_packet(sock, recvbuf, recvlen, nullptr, nullptr);
-        }
-        // Process incoming header and write outgoing header
-        process_packet_header(&header_info, header_in, header_out);
 
-        // Unpack received data into cassie user input struct
-        unpack_cassie_out_t(data_in, &cassie_out);
-
-        // pack torques to get ready to send
-        pack_cassie_user_in_t(&cassie_user_in, data_out);
-
-        // Send response
-        send_packet(sock, sendbuf, sendlen, nullptr, 0);
-
-        ///////////////////////////////////process data //////////////////////////////////////////////////
-
+        ///////////////////////////////////////////////////////
         processProprioception_msg(cassie_out);
 
         // Get encoder positions

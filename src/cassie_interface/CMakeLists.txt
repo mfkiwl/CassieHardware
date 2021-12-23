@@ -18,7 +18,7 @@ catkin_package(
 )
 
 # Specify custom includes and libs
-include_directories(include ${GAZEBO_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS})
+include_directories(include ${GAZEBO_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS} (HOME)/.mujoco/mujoco210/include)
 list(APPEND CMAKE_CXX_FLAGS "-Wno-deprecated-declarations -Wno-dev ${GAZEBO_CXX_FLAGS}")
 
 # Create UDP interface library and install
@@ -29,3 +29,10 @@ target_link_libraries(cassieplugin ${GAZEBO_LIBRARIES} ${catkin_LIBRARIES} ${PRO
 # Build the core interface node
 add_executable(cassie_interface_node src/cassie_interface_node.cpp src/udp.c)
 target_link_libraries(cassie_interface_node ${catkin_LIBRARIES} ${PROJECT_SOURCE_DIR}/lib/libagilitycassie.a)
+
+
+# Build the core interface node
+add_executable(cassie_mujocoSim_node src/cassie_mujocoSim_node.cpp src/udp.c) # src/cassiemujoco.c)
+target_link_libraries(cassie_mujocoSim_node ${catkin_LIBRARIES} ${PROJECT_SOURCE_DIR}/lib/libagilitycassie.a ${PROJECT_SOURCE_DIR}/src/libcassiemujoco.so)
+
+

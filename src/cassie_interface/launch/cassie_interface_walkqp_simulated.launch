@@ -1,7 +1,7 @@
 <?xml version="1.0" ?>
 <launch>
 
-<include file="$(find cassie_interface)/launch/cassie_world.launch"/>
+<!-- <include file="$(find cassie_interface)/launch/cassie_world.launch"/> -->
 
 <rosparam>
     use_sim_time: true
@@ -183,6 +183,10 @@
                     w_Vdot: 1.4
 </rosparam>
 
-<node name="cassie_interface_node" pkg="cassie_interface" type="cassie_interface_node" args="" respawn="false" />
+<node name="cassie_mujocoSim_node" pkg="cassie_interface" type="cassie_mujocoSim_node" args="" respawn="false" />
+
+<node name="locomotion_node_new" pkg="cassie_controllers" type="locomotion_node_new" args="" respawn="false" output="screen"/>
+
+<node name="cassie_estimation_node" pkg="cassie_estimation" type="cassie_estimation_node" args="" respawn="false" output="screen"/>
 
 </launch>

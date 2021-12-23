@@ -1,10 +1,10 @@
 <?xml version="1.0" ?>
 <launch>
 
-<include file="$(find cassie_interface)/launch/cassie_world.launch"/>
+<!-- <include file="$(find cassie_interface)/launch/cassie_world.launch"/> -->
 
 <rosparam>
-    use_sim_time: true
+    use_sim_time: false
     cassie:
         is_simulation: true
         dt: 0.0005
@@ -183,6 +183,6 @@
                     w_Vdot: 1.4
 </rosparam>
 
-<node name="cassie_interface_node" pkg="cassie_interface" type="cassie_interface_node" args="" respawn="false" />
+<node name="cassie_mujocoSim_node" pkg="cassie_interface" type="cassie_mujocoSim_node" args="" respawn="false" output = "screen"/>
 
 </launch>
