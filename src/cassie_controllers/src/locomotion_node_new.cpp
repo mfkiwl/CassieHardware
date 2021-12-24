@@ -162,15 +162,13 @@ int main(int argc, char *argv[])
     VectorXd u_old(10);
     u_old.setZero();
 
-    while (ros::ok())
-    {
-        ros::spinOnce();
-        looprate.sleep();
+    // while (ros::ok())
+    // {
+    //     ros::spinOnce();
+    //     looprate.sleep();
+    // }
 
-        
-    }
-
-    /*while (ros::ok()) {
+    while (ros::ok()) {
         // Do things
         ros::spinOnce();
 
@@ -258,8 +256,7 @@ int main(int argc, char *argv[])
         }
 
 
-
-
+        // check if NAN torques
         for (unsigned int i = 0; i < 10; ++i) {
             bool val = std::isnan(control_message.motor_torque[i]);
             if (val) {
@@ -271,14 +268,13 @@ int main(int argc, char *argv[])
                 return 1;
             }
         }
-
         // Publish the control message
         control_message.header.stamp = ros::Time::now();
         controller_pub.publish(control_message);
 
         looprate.sleep();
     }
-*/
+
     if (log_controller)
     {
         logfileWalk.close();

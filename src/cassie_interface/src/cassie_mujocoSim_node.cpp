@@ -58,7 +58,6 @@ static ros_utilities::Timer estimation_realtime_timer(true);
 void controller_callback(const cassie_common_toolbox::cassie_control_msg::ConstPtr &controlmsg)
 {
     timeout_timer.restart();
-    cout << "what the fuck" << endl;
     for (unsigned long i = 0; i < 10; i++)
     {
         u[i] = controlmsg->motor_torque[i];
@@ -90,7 +89,7 @@ int main(int argc, char *argv[])
     VectorXd safe_torque_limit(10);
     ros::param::get("/cassie/interface/safe_torque_limit", stl);
     yaml_utilities::yaml_read_string(stl, safe_torque_limit);
-    std::cout << "Using safe torque limit: " << safe_torque_limit.transpose() << std::endl;
+    cout << "Using safe torque limit: " << safe_torque_limit.transpose() << sendl;
 
     //////////////////////// Mujoco Setup /////////////////////////////////////////////////
     bool visualize = true;
@@ -145,7 +144,7 @@ int main(int argc, char *argv[])
         // Check the timeout and see if the torque must be zeroed
         if (timeout_timer.elapsed() > 0.01) // seconds
         {
-            cout << "time out: " << timeout_timer.elapsed() << endl;
+            // cout << "time out: " << timeout_timer.elapsed() << endl;
             for (unsigned long i = 0; i < 10; i++)
                 u[i] = 0.0;
         }
@@ -239,41 +238,15 @@ int main(int argc, char *argv[])
 
             double *timeMujoP = cassie_sim_time(sim);
             double tMujo = *timeMujoP;
-            cout << "Mujo Ros Time Diff:" << tMujo - (ros::Time::now().toSec()- tNodeStart) << endl;
+            // cout << "Mujo Ros Time Diff:" << tMujo - (ros::Time::now().toSec()- tNodeStart) << endl;
             // Do simulation
-            if (ros::Time::now().toSec() > 1)
-            {
-                // Crouch simulation
-                // cassie_out.pelvis.radio.channel[SH] = -1.0;
-                 cout << "ROS time:" << ros::Time::now().toSec() << endl;
-                // Walk simulation
-                cassie_out.pelvis.radio.channel[SB] = 1.0;
-
-                cout << "am here" << endl;
-                if (ros::Time::now().toSec() > 25.0)
-                    cassie_out.pelvis.radio.channel[LV] = 1.;
-                if (ros::Time::now().toSec() > 45.0)
-                    cassie_out.pelvis.radio.channel[LV] = 0.;
-                if (ros::Time::now().toSec() > 55.0)
-                    cassie_out.pelvis.radio.channel[LV] = -1.;
-                if (ros::Time::now().toSec() > 65.0)
-                    cassie_out.pelvis.radio.channel[LV] = 0.;
-                if (ros::Time::now().toSec() > 75.0)
-                    cassie_out.pelvis.radio.channel[LH] = 1.;
-                if (ros::Time::now().toSec() > 85.0)
-                    cassie_out.pelvis.radio.channel[LH] = 0.;
-                if (ros::Time::now().toSec() > 95.0)
-                {
-                    cassie_out.pelvis.radio.channel[LH] = -0.50;
-                    cassie_out.pelvis.radio.channel[LV] = 0.50;
-                }
-            }
+            
 
             // Radio is all zero until the robot is calibrated. Extra safety precaution.
             for (unsigned int i = 0; i < 16; i++)
                 proprioception_msg.radio[i] = cassie_out.pelvis.radio.channel[i];
 
-            // Add header
+            // publish 
             proprioception_msg.header.stamp = ros::Time::now();
             proprioception_pub.publish(proprioception_msg);
 
@@ -332,6 +305,36 @@ int main(int argc, char *argv[])
     }
     if (log_interface)
         logfile.close();
+}
+
+
+void FakeJoystickCmd(cassie_out_t &cassie_out){
+if (ros::Time::now().toSec() > 1)
+{
+    // Crouch simulation
+    // cassie_out.pelvis.radio.channel[SH] = -1.0;
+    //  cout << "ROS time:" << ros::Time::now().toSec() << endl;
+    // Walk simulation
+    // cassie_out.pelvis.radio.channel[SB] = 1.0;
+
+    if (ros::Time::now().toSec() > 25.0)
+        cassie_out.pelvis.radio.channel[LV] = 1.;
+    if (ros::Time::now().toSec() > 45.0)
+        cassie_out.pelvis.radio.channel[LV] = 0.;
+    if (ros::Time::now().toSec() > 55.0)
+        cassie_out.pelvis.radio.channel[LV] = -1.;
+    if (ros::Time::now().toSec() > 65.0)
+        cassie_out.pelvis.radio.channel[LV] = 0.;
+    if (ros::Time::now().toSec() > 75.0)
+        cassie_out.pelvis.radio.channel[LH] = 1.;
+    if (ros::Time::now().toSec() > 85.0)
+        cassie_out.pelvis.radio.channel[LH] = 0.;
+    if (ros::Time::now().toSec() > 95.0)
+    {
+        cassie_out.pelvis.radio.channel[LH] = -0.50;
+        cassie_out.pelvis.radio.channel[LV] = 0.50;
+    }
+}
 }
 
 void processProprioception_msg(cassie_out_t &cassie_out)
