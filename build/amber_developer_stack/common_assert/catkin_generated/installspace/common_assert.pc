@@ -1,8 +1,0 @@
-prefix=/home/xiaobin/cassie_ws/install
-
-Name: common_assert
-Description: Description of common_assert
-Version: 0.0.0
-Cflags: -I${prefix}/include
-Libs: -L${prefix}/lib 
-Requires: 

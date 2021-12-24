@@ -1,8 +1,0 @@
-prefix=/home/xiaobin/cassie_ws/install
-
-Name: control_eigen_utilities
-Description: Description of control_eigen_utilities
-Version: 0.0.0
-Cflags: -I${prefix}/include
-Libs: -L${prefix}/lib 
-Requires: control_utilities eigen_utilities

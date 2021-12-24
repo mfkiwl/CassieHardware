@@ -1,8 +1,0 @@
-prefix=/home/xiaobin/cassie_ws/devel
-
-Name: cassie_description
-Description: Description of cassie_description
-Version: 0.0.0
-Cflags: -I/home/xiaobin/cassie_ws/src/cassie_description/include -I/home/xiaobin/cassie_ws/src/cassie_description/gen/include -I/home/xiaobin/cassie_ws/src/cassie_description/gen/include/frost_expr -I/home/xiaobin/cassie_ws/src/cassie_description/gen/src -I/usr/local/include -I/usr/include/eigen3
-Libs: -L${prefix}/lib -lcassie_description -lrbdl
-Requires: roscpp rospy roslib eigen_utilities cassie_common_toolbox

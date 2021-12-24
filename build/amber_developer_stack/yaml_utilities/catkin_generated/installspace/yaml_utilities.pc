@@ -1,8 +1,0 @@
-prefix=/home/xiaobin/cassie_ws/install
-
-Name: yaml_utilities
-Description: Description of yaml_utilities
-Version: 0.0.0
-Cflags: -I${prefix}/include -I/usr/include
-Libs: -L${prefix}/lib -lyaml_utilities /usr/lib/x86_64-linux-gnu/libboost_system.so /usr/lib/x86_64-linux-gnu/libboost_filesystem.so
-Requires: common_cmake common_assert stl_utilities yaml_cpp_0_2_7

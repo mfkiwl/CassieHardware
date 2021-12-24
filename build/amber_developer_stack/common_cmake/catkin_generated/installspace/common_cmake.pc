@@ -1,8 +1,0 @@
-prefix=/home/xiaobin/cassie_ws/install
-
-Name: common_cmake
-Description: Description of common_cmake
-Version: 0.0.0
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 
