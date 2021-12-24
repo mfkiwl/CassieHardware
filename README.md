@@ -30,7 +30,7 @@ copy libcassiemujoco.so, cassie.xml to cassie_interface too
 
 In the CMakelist, in cassie_interface, add the following, or simply copy the one from CassieHardware
 
-# Build the core interface node
+### # Build the core interface node
 add_executable(cassie_mujocoSim_node src/cassie_mujocoSim_node.cpp src/udp.c) # src/cassiemujoco.c)
 target_link_libraries(cassie_mujocoSim_node ${catkin_LIBRARIES} ${PROJECT_SOURCE_DIR}/lib/libagilitycassie.a ${PROJECT_SOURCE_DIR}/src/libcassiemujoco.so)
 
