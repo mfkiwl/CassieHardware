@@ -110,6 +110,7 @@ void get_proprioception_encoders(const cassie_common_toolbox::cassie_propriocept
     dq(RightFootPitch)    = propmsg.encoder_velocity[13];
 }
 
+//removed linear velocity with ekf estimation
 void get_proprioception_orientation(const cassie_common_toolbox::cassie_proprioception_msg& propmsg, Eigen::VectorXd &q, Eigen::VectorXd &dq, Eigen::Quaterniond &quat) {
     // Get the pelvis rotation via the IMU
     // Assign the pelvis rotation
@@ -119,14 +120,16 @@ void get_proprioception_orientation(const cassie_common_toolbox::cassie_proprioc
     quat.z() = propmsg.orientation.z;
 
     Eigen::Matrix3d RateMatrix;
-    //RateMatrix <<
-    //    1., sin(q(BaseRotX))*tan(q(BaseRotY)), cos(q(BaseRotX))*tan(q(BaseRotY)),
-    //    0, cos(q(BaseRotX)), -sin(q(BaseRotX)),
-    //    0, sin(q(BaseRotX))/cos(q(BaseRotY)), cos(q(BaseRotX))/cos(q(BaseRotY));
+//    Jenna's version
+//    RateMatrix <<
+//    1.0/cos(q(BaseRotY)), 0.0, 0.0,
+//    0,                    1.0, 0.0,
+//    tan(q(BaseRotY)),     0.0, 1.0;
     RateMatrix <<
         1.0/cos(q(BaseRotY)), 0.0, 0.0,
         0,                    1.0, 0.0,
-        tan(q(BaseRotY)),     0.0, 1.0;
+        -tan(q(BaseRotY)),     0.0, 1.0;
+
 
     dq(BaseRotX) = propmsg.angular_velocity.x;
     dq(BaseRotY) = propmsg.angular_velocity.y;
@@ -137,21 +140,21 @@ void get_proprioception_orientation(const cassie_common_toolbox::cassie_proprioc
     Eigen::Matrix3d R = quat.toRotationMatrix();
     Eigen::EulerAnglesXYZd euler = Eigen::EulerAnglesXYZd::FromRotation<false, false, false>(quat);
     eulerXYZ(quat, euler);
-    Eigen::Matrix3d Rz;
-    Rz << cos(euler.gamma()), -sin(euler.gamma()), 0,
-          sin(euler.gamma()), cos(euler.gamma()),  0,
-          0,                  0,                   1;
-    R = Rz.transpose() * R;
-    Eigen::Quaterniond tempquat(R);
-    eulerXYZ(tempquat, euler);
+//    Eigen::Matrix3d Rz;
+//    Rz << cos(euler.gamma()), -sin(euler.gamma()), 0,
+//          sin(euler.gamma()), cos(euler.gamma()),  0,
+//          0,                  0,                   1;
+//    R = Rz.transpose() * R;
+//    Eigen::Quaterniond tempquat(R);
+//    eulerXYZ(tempquat, euler);
     q(BaseRotX) = euler.alpha(); // roll
     q(BaseRotY) = euler.beta();  // pitch
     q(BaseRotZ) = euler.gamma(); // yaw
 
-    // Linear velocity
-    dq(BasePosX) = propmsg.linear_velocity.x;
-    dq(BasePosY) = propmsg.linear_velocity.y;
-    dq(BasePosZ) = propmsg.linear_velocity.z;
+//    // Linear velocity
+//    dq(BasePosX) = propmsg.linear_velocity.x;
+//    dq(BasePosY) = propmsg.linear_velocity.y;
+//    dq(BasePosZ) = propmsg.linear_velocity.z;
 }
 
 void unpack_estimation(const cassie_common_toolbox::cassie_estimation_msg::ConstPtr& estmsg, Eigen::VectorXd &q, Eigen::VectorXd &dq, Eigen::Quaterniond &quat) {

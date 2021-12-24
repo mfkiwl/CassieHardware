@@ -132,6 +132,7 @@ private:
     * @brief Persistent controller configurations
     */
     struct Config {
+        bool isSim;
         bool use_qp;
         bool clf_use_Vdot_cost;
         bool clf_use_inequality;
@@ -227,8 +228,8 @@ private:
 
     // Various control methods
     void runInverseKinematics(MatrixXd &pLF, MatrixXd &pRF);
-    VectorXd getTorqueQP();
-    VectorXd getTorqueID();
+    void getTorqueQP();
+    void getTorqueID();
     void computeDesired(VectorXd &radio);
     void computeActual();
 

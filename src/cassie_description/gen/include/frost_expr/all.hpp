@@ -111,7 +111,7 @@ public:
 #include <constraints/p_right_fixed_constraint.hh>
 
 // Dynamics
-//#include <dynamics/Ce_cassie_v4.hh>
+//#include <dynamics/Fvectot_cassie_v4.hh>
 #include <dynamics/De_cassie_v4.hh>
 #include <dynamics/Ge_cassie_v4.hh>
 #include <dynamics/F_spring_cassie_v4.hh>
@@ -129,8 +129,12 @@ public:
 #include <kinematics/p_rightToe.hh>
 #include <kinematics/J_leftToe.hh>
 #include <kinematics/J_rightToe.hh>
-#include <kinematics/p_com.hh>
-
+#include <kinematics/p_com_LeftStance.hh>
+#include <kinematics/p_com_RightStance.hh>
+#include <kinematics/J_com_LeftStance.hh>
+#include <kinematics/J_com_RightStance.hh>
+#include <kinematics/p_com_absolute.hh>
+#include <kinematics/dp_com_absolute.hh>
 // Outputs
 #include <outputs/DLfya_LeftStanceActual.hh>
 #include <outputs/DLfya_RightStanceActual.hh>
@@ -158,4 +162,31 @@ public:
 #include <outputs/leftLegRollVelocity.hh>
 #include <outputs/rightLegRollVelocity.hh>
 
+#include "outputs/yaStandCOM_new.hh"
+#include "outputs/dyaStandCOM_new.hh"
+#include "outputs/Dya_standCOM_new.hh"
+#include "outputs/DLfya_standCOM_new.hh"
+
+
+//Xiaobin's HLIP Outputs
+#include <Xiaobin_outputs/DLfya_LeftStanceActual_new.hh>
+#include <Xiaobin_outputs/DLfya_RightStanceActual_new.hh>
+#include <Xiaobin_outputs/Jdot_yLeftStanceActual.hh>
+#include <Xiaobin_outputs/Jdot_yRightStanceActual.hh>
+#include <Xiaobin_outputs/Dya_LeftStanceActual_new.hh>
+#include <Xiaobin_outputs/Dya_RightStanceActual_new.hh>
+#include <Xiaobin_outputs/J_yaLeftStance_all.hh>
+#include <Xiaobin_outputs/J_yaLeftStance_new.hh>
+#include <Xiaobin_outputs/J_yaRightStance_all.hh>
+#include <Xiaobin_outputs/J_yaRightStance_new.hh>
+#include <Xiaobin_outputs/dyaLeftStance_new.hh>
+#include <Xiaobin_outputs/dyaRightStance_new.hh>
+#include <Xiaobin_outputs/yaLeftStance_new.hh>
+#include <Xiaobin_outputs/yaRightStance_new.hh>
+#include <Xiaobin_outputs/CentroidalMomentum.hh>
+
+#include <Xiaobin_outputs/J_leftFootPitchYaw.hh>
+#include <Xiaobin_outputs/dJ_leftFootPitchYaw.hh>
+#include <Xiaobin_outputs/J_rightFootPitchYaw.hh>
+#include <Xiaobin_outputs/dJ_rightFootPitchYaw.hh>
 #endif // FROSTALL_HPP

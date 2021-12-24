@@ -6,7 +6,7 @@
 % 	 https://github.com/ayonga/frost-dev
 % 
 % Author: Jenna Reher (jreher@caltech.edu)
-% Automatically generated on: February 02, 2021 T 01:46
+% Automatically generated on: August 26, 2021 T 02:18
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function out = p_right_fixed_constraint(var1)
 

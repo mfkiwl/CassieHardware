@@ -3,6 +3,7 @@ set(SRCS
     gen/src/De_cassie_v4.cc
     gen/src/Ge_cassie_v4.cc
     gen/src/F_spring_cassie_v4.cc
+
     gen/src/p_achilles_constraint.cc
     gen/src/p_leftPoint_constraint.cc
     gen/src/p_rightPoint_constraint.cc
@@ -37,7 +38,13 @@ set(SRCS
     gen/src/Jdot_left_fixed_constraint.cc
     gen/src/Jdot_right_fixed_constraint.cc
 
-    gen/src/p_com.cc
+    gen/src/p_com_LeftStance.cc
+    gen/src/J_com_LeftStance.cc
+    gen/src/p_com_RightStance.cc
+    gen/src/J_com_RightStance.cc
+    gen/src/p_com_absolute.cc
+    gen/src/dp_com_absolute.cc
+
     gen/src/pose_leftFoot.cc
     gen/src/pose_rightFoot.cc
     gen/src/J_leftFoot.cc
@@ -76,7 +83,38 @@ set(SRCS
     gen/src/Dya_LeftStanceActual.cc
     gen/src/Dya_RightStanceActual.cc
     gen/src/Dya_standCOM.cc
-    )
+
+    gen/src/yaStandCOM_new.cc
+    gen/src/dyaStandCOM_new.cc
+    gen/src/Dya_standCOM_new.cc
+    gen/src/DLfya_standCOM_new.cc
+
+
+    gen/src/yaRightStance_new.cc
+    gen/src/yaLeftStance_new.cc
+    gen/src/dyaRightStance_new.cc
+    gen/src/dyaLeftStance_new.cc
+    gen/src/J_yaRightStance_new.cc
+    gen/src/J_yaLeftStance_new.cc
+    gen/src/J_yaRightStance_all.cc
+    gen/src/J_yaLeftStance_all.cc
+    gen/src/Jdot_yRightStanceActual.cc
+    gen/src/Jdot_yLeftStanceActual.cc
+    gen/src/Dya_RightStanceActual_new.cc
+    gen/src/Dya_LeftStanceActual_new.cc
+    gen/src/DLfya_RightStanceActual_new.cc
+    gen/src/DLfya_LeftStanceActual_new.cc
+    gen/src/CentroidalMomentum.cc
+
+    gen/src/J_rightFootPitchYaw.cc
+    gen/src/dJ_rightFootPitchYaw.cc
+    gen/src/J_leftFootPitchYaw.cc
+    gen/src/dJ_leftFootPitchYaw.cc
+
+
+
+
+        )
 include_directories(
     gen/include
     gen/include/frost_expr
@@ -84,4 +122,5 @@ include_directories(
     gen/include/frost_expr/kinematics
     gen/include/frost_expr/constraints
     gen/include/frost_expr/outputs
+    gen/include/frost_expr/Xiaobin_outputs
     )

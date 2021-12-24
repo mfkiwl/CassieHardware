@@ -104,7 +104,7 @@ void StandingControlQP::Cache::reset() {
     this->A_chatter.setZero();
     this->b_chatter.setZero();
     this->A_friction.setZero();
-    this->b_lb_friction.setZero();
+    this->b_lb_friction.setZero(                           );
     this->b_ub_friction.setZero();
     this->A_y.setZero();
     this->b_y.setZero();
@@ -182,6 +182,8 @@ void StandingControlQP::Config::init() {
 }
 
 void StandingControlQP::Config::reconfigure() {
+    this->isSim = false;
+    ros::param::get("/cassie/is_simulation", this->isSim);
     this->paramChecker.checkAndUpdate("/cassie/locomotion_control/dt", this->control_rate);
     this->paramChecker.checkAndUpdate("use_qp", this->use_qp);
 
@@ -255,14 +257,31 @@ void StandingControlQP::Config::reconfigure() {
     double foot_length = 0.14;
     this->contact_pyramid.resize(9, 5);
     this->contact_pyramid << 0., 0., -1., 0., 0.,
-            1., 0., -2.*mu/sqrt(2.), 0., 0.,
+            1., 0., -mu/sqrt(2.), 0., 0.,
             -1., 0., -mu/sqrt(2.), 0., 0.,
             0., 1., -mu/sqrt(2.), 0., 0.,
             0., -1., -mu/sqrt(2.), 0., 0.,
-            0., 0., -foot_length/2., 0., 1.,
-            0., 0., -foot_length/2., 0, -1.,
-            0., 0., -foot_length/2., 1., 0.,
-            0., 0., -foot_length/2., -1., 0.;
+            0., 0., -foot_length*mu/2., 0., 1.,
+            0., 0., -foot_length*mu/2., 0, -1.,
+            0., 0., -foot_length*mu/2., 1., 0.,
+            0., 0., -foot_length*mu/2., -1., 0.;
+
+//    // Contact conditions
+//    double mu = 0.6;
+////    double foot_length = 0.0873;
+//        double foot_length = 0.14;
+//    this->contact_pyramid.resize(9, 5);
+//    this->contact_pyramid << 0., 0., -1., 0., 0.,
+//    1., 0., -mu/sqrt(2.), 0., 0.,
+//    -1., 0., -mu/sqrt(2.), 0., 0.,
+//    0., 1., -mu/sqrt(2.), 0., 0.,
+//    0., -1., -mu/sqrt(2.), 0., 0.,
+//    0., 0., -foot_length*mu, 0., 1.,
+//    0., 0., -foot_length*mu, 0, -1.,
+//    0., 0., -foot_length, 1., 0.,
+//    0., 0., -foot_length, -1., 0.;
+
+
 
     // Safe torque bounds
     this->torque_bounds.resize(10);
@@ -397,7 +416,7 @@ void StandingControlQP::update(VectorXd &radio, VectorXd &u) {
         this->cache.IK_solution(i) = q_motors(i);
     }
 
-    // Get current foot positions (using deflected legs!)
+    // Get current foot positions (using deflected legs!) from FROST gen
     SymFunction::p_leftSole_constraint(this->cache.pLF_actual, this->robot->q);
     SymFunction::p_rightSole_constraint(this->cache.pRF_actual, this->robot->q);
 
@@ -418,18 +437,18 @@ void StandingControlQP::update(VectorXd &radio, VectorXd &u) {
 
     // Compute controller
     if ( this->memory.contact_initialized && this->config.use_qp ) {
-        u = this->getTorqueQP();
+        this->getTorqueQP();
     } else {
         this->runInverseKinematics(this->cache.pLF_actual, this->cache.pRF_actual);
-        u = this->getTorqueID();
+        this->getTorqueID();
     }
+    u= this->cache.u;
 
     // Check if we are at the end of the transition phase...
     // This is implemented for transitioning to our walking controller. Not currently released.
     if (this->memory.queueTransition) {
-        if ( (this->heightFilter.getValue() < 0.95 * this->config.height_lb) ) {
+       // if ( (this->heightFilter.getValue() < 0.95 * this->config.height_lb) )
             this->memory.readyToTransition = true;
-        }
     }
 }
 
@@ -499,7 +518,7 @@ void StandingControlQP::computeDesired(VectorXd &radio) {
     }
 }
 
-VectorXd StandingControlQP::getTorqueQP() {
+void StandingControlQP::getTorqueQP() {
     // Zero torque
     VectorXd u = VectorXd::Zero(10);
 
@@ -508,13 +527,13 @@ VectorXd StandingControlQP::getTorqueQP() {
     // Compute the robot constraints
     this->robot->kinematics.update(this->robot->model, this->robot->q, this->robot->dq);
     this->cache.Jc << this->robot->kinematics.cache.J_achilles,
-            this->robot->kinematics.cache.J_rigid,
-            this->robot->kinematics.cache.J_poseLeftConstraint,
-            this->robot->kinematics.cache.J_poseRightConstraint;
+                      this->robot->kinematics.cache.J_rigid,
+                      this->robot->kinematics.cache.J_poseLeftConstraint,
+                      this->robot->kinematics.cache.J_poseRightConstraint;
     this->cache.dJc << this->robot->kinematics.cache.Jdot_achilles,
-            this->robot->kinematics.cache.Jdot_rigid,
-            this->robot->kinematics.cache.Jdot_poseLeftConstraint,
-            this->robot->kinematics.cache.Jdot_poseRightConstraint;
+                       this->robot->kinematics.cache.Jdot_rigid,
+                       this->robot->kinematics.cache.Jdot_poseLeftConstraint,
+                       this->robot->kinematics.cache.Jdot_poseRightConstraint;
     this->cache.A_holonomics.block(0,0, 16,22) << this->cache.Jc;
     this->cache.b_holonomics << - this->cache.dJc * this->robot->dq;
 
@@ -551,7 +570,7 @@ VectorXd StandingControlQP::getTorqueQP() {
     Jddq << this->cache.Dya.block(0,0,6,22),
             this->cache.Jc;
     Jdotddq << this->cache.DLfya.block(0,0,6,22),
-            this->cache.dJc;
+               this->cache.dJc;
     ddq_tar = Jddq.completeOrthogonalDecomposition().solve(ddr_tar - Jdotddq * this->robot->dq);
 
     // CLF terms
@@ -609,32 +628,31 @@ VectorXd StandingControlQP::getTorqueQP() {
     b_reg(46) = 150.;
 
     w_reg << this->config.reg_ddq * VectorXd::Ones(22),    // ddq
-            this->config.reg_u * VectorXd::Ones(10),       // u
-            this->config.reg_achilles * VectorXd::Ones(2), // lambda_ach
-            this->config.reg_rigid * VectorXd::Ones(4),    // lambda_rigid
-            this->config.reg_fx,        // fx_left
-            this->config.reg_fy,        // fy_left
-            this->config.reg_fz,        // fz_left
-            this->config.reg_muy,       // mu_y_left
-            this->config.reg_muz,       // mu_z_left
-            this->config.reg_fx,        // fx_right
-            this->config.reg_fy,        // fy_right
-            this->config.reg_fz,        // fz_right
-            this->config.reg_muy,       // mu_y_right
-            this->config.reg_muz,       // mu_z_right
-            this->config.reg_clf_delta; // clf delta
-
+             this->config.reg_u * VectorXd::Ones(10),       // u
+             this->config.reg_achilles * VectorXd::Ones(2), // lambda_ach
+             this->config.reg_rigid * VectorXd::Ones(4),    // lambda_rigid
+             this->config.reg_fx,        // fx_left
+             this->config.reg_fy,        // fy_left
+             this->config.reg_fz,        // fz_left
+             this->config.reg_muy,       // mu_y_left
+             this->config.reg_muz,       // mu_z_left
+             this->config.reg_fx,        // fx_right
+             this->config.reg_fy,        // fy_right
+             this->config.reg_fz,        // fz_right
+             this->config.reg_muy,       // mu_y_right
+             this->config.reg_muz,       // mu_z_right
+             this->config.reg_clf_delta; // clf delta
     VectorXd w_u_chatter(10);
     w_u_chatter << this->config.w_u_chatter * VectorXd::Ones(10);
 
     VectorXd w_hol(16);
     VectorXd w_con(5);
     w_con << this->config.w_hol_fx, this->config.w_hol_fy, this->config.w_hol_fz,
-            this->config.w_hol_my, this->config.w_hol_mz;
+             this->config.w_hol_my, this->config.w_hol_mz;
     w_hol << this->config.w_hol_achilles * VectorXd::Ones(2), // achilles
-            this->config.w_hol_fixed * VectorXd::Ones(4),     // rigid spring
-            w_con,                                            // contact left
-            w_con;                                            // contact right
+             this->config.w_hol_fixed * VectorXd::Ones(4),     // rigid spring
+             w_con,                                            // contact left
+             w_con;                                            // contact right
 
     // Build the final QP formulation
     long n_var = 49;
@@ -643,17 +661,17 @@ VectorXd StandingControlQP::getTorqueQP() {
     Eigen::Matrix<double,Dynamic,Dynamic,RowMajor> A(n_cost_terms,n_var); // Gets passed directly to
     VectorXd b(n_cost_terms);
     w << w_hol,
-            w_u_chatter,
-            this->config.w_outputs * VectorXd::Ones(6),
-            w_reg;
+         w_u_chatter,
+         this->config.w_outputs * VectorXd::Ones(6),
+         w_reg;
     A << this->cache.A_holonomics,
-            this->cache.A_chatter,
-            this->cache.A_y,
-            A_reg;
+         this->cache.A_chatter,
+         this->cache.A_y,
+         A_reg;
     b << this->cache.b_holonomics,
-            this->cache.b_chatter,
-            this->cache.b_y,
-            b_reg;
+         this->cache.b_chatter,
+         this->cache.b_y,
+         b_reg;
     for (int i=0; i<w.size(); i++) {
         b(i) *= w(i);
         A.row(i) *= w(i);
@@ -702,129 +720,23 @@ VectorXd StandingControlQP::getTorqueQP() {
     if (success != SUCCESSFUL_RETURN) {
         ROS_WARN("THE QP DID NOT CONVERGE!");
         this->runInverseKinematics(this->cache.pLF_actual, this->cache.pRF_actual);
-        u = this->getTorqueID();
+        this->getTorqueID();
         this->qpsolver->reset();
         this->memory.qp_initialized = false;
         this->memory.u_prev.setZero();
     }
     else {
         this->memory.u_prev = this->cache.qpsol.segment(22,10);
-        u << torqueScale.cwiseProduct(this->cache.qpsol.segment(22,10));
+        this->cache.u << torqueScale.cwiseProduct(this->cache.qpsol.segment(22,10));
     }
-    this->cache.Fdes << this->cache.qpsol.segment(32,16);
+    this->cache.Fdes = this->cache.qpsol.segment(32,16);
     this->cache.delta = this->cache.qpsol(48);
 
-    // Return
-    this->cache.u << u;
-    return u;
 }
 
-VectorXd StandingControlQP::getTorqueID() {
-    VectorXd u(10);
-    VectorXd q_motors(10), dq_motors(10);
-    for (int i = 0; i < this->robot->iRotorMap.size(); ++i) {
-        int ind = this->robot->iRotorMap(i);
-        q_motors(i) = this->robot->q(ind);
-        dq_motors(i) = this->robot->dq(ind);
-    }
 
-    // Compute torques via PD
-    u = this->pd.compute(this->cache.IK_solution, this->cache.dq_desired, q_motors, dq_motors);
 
-    if (this->memory.contact_initialized) {
-        // Feedforward from Inverse Dynamics
-        this->robot->dynamics.calcHandC(this->robot->model, this->robot->q, this->robot->dq);
-        MatrixXd B(22,10);
-        B.setZero();
-        B(LeftHipRoll,0) = 1.;
-        B(LeftHipYaw,1) = 1.;
-        B(LeftHipPitch,2) = 1.;
-        B(LeftKneePitch,3) = 1.;
-        B(LeftFootPitch,4) = 1.;
-        B(RightHipRoll,5) = 1.;
-        B(RightHipYaw,6) = 1.;
-        B(RightHipPitch,7) = 1.;
-        B(RightKneePitch,8) = 1.;
-        B(RightFootPitch,9) = 1.;
 
-        // Compute the robot constraints
-        MatrixXd Jc(14,22);
-        this->robot->kinematics.update(this->robot->model, this->robot->q, this->robot->q);
-        Jc << this->robot->kinematics.cache.J_achilles,
-                this->robot->kinematics.cache.J_rigid,
-                this->robot->kinematics.cache.J_poseLeftConstraint.block(0,0,4,22), // Leave out foot yaw
-                this->robot->kinematics.cache.J_poseRightConstraint.block(0,0,4,22);
-
-        MatrixXd Ge(22,1); Ge.setZero();
-        SymFunction::Ge_cassie_v4(Ge, this->robot->q);
-
-        MatrixXd P(22,22);
-        P = MatrixXd::Identity(22,22) - Jc.completeOrthogonalDecomposition().solve(Jc);
-
-        VectorXd ff(10);
-        MatrixXd PB(22,10);
-        PB = P*B;
-        //ff = PB.completeOrthogonalDecomposition().solve(P) * Ge;
-        ff = PB.completeOrthogonalDecomposition().solve(P) * this->robot->dynamics.C;
-        u += ff;
-
-        // Add a naiive toe regulator...
-        u(4) -= 45. * (this->robot->q(BaseRotY) - this->cache.pitch_desired) + 2. * this->robot->dq(BaseRotY);
-        u(9) -= 45. * (this->robot->q(BaseRotY) - this->cache.pitch_desired) + 2. * this->robot->dq(BaseRotY);
-    }
-    return u;
-}
-
-void StandingControlQP::runInverseKinematics(MatrixXd &pLF, MatrixXd &pRF) {
-    // Get desired pelvis position
-    double pdes = this->pitchFilter.getValue();
-    Matrix3d Rot;
-    Rot << cos(pdes), 0, sin(pdes),
-           0, 1, 0,
-           -sin(pdes), 0, cos(pdes);
-    this->cache.T_des_pelvis.matrix().block(0,0,3,3) << Rot;
-
-    VectorXd footDiff(3);
-    footDiff = this->memory.T_leftContact.translation() - this->memory.T_rightContact.translation();
-
-    // X position
-    this->cache.T_des_leftFoot(0,3)  = -footDiff(0) - this->cache.yd(0);
-    this->cache.T_des_rightFoot(0,3) =  footDiff(0) - this->cache.yd(0);
-
-    // Y position
-    this->cache.T_des_leftFoot(1,3)  =  footDiff(1) / 2. - this->cache.yd(1);
-    this->cache.T_des_rightFoot(1,3) = -footDiff(1) / 2. - this->cache.yd(1);
-
-    // Z position
-    double roll  = this->robot->q(3);
-    double droll = this->robot->dq(3);
-    double lateralStabilizer = 0.0;
-    if (this->config.use_lateral_comp)
-        lateralStabilizer = this->memory.spoolup * (this->config.Kp_lateral_compensator * roll + this->config.Kd_lateral_compensator * droll);
-    this->cache.T_des_leftFoot(2,3)  = -this->cache.yd(2)  + lateralStabilizer / 2.0;
-    this->cache.T_des_rightFoot(2,3) = -this->cache.yd(2) - lateralStabilizer / 2.0;
-
-    // Set residual function target
-    double footpitch_target = 0.0;
-    this->IKfunction.setTarget(this->cache.T_des_pelvis,
-                               this->cache.T_des_leftFoot, footpitch_target,
-                               this->cache.T_des_rightFoot, footpitch_target);
-
-    // Solve the IK problem - uses current state as the initial guess
-    int iksuccess = this->InverseKinematics(this->cache.IK_solution);
-    if (iksuccess < 0) {
-        // Don't use solution if it failed ...
-        // Just do what the last command was
-        this->cache.IK_solution << this->memory.IK_solution_prev;
-    }
-
-    // Compute the desired velocities
-    this->cache.target_velocities << this->cache.dyd.segment(0,3),  0.0, -this->cache.dyd(4),
-                                     this->cache.dyd.segment(0,3),  0.0, -this->cache.dyd(4);
-
-    this->IKfunction.df(this->cache.IK_solution, this->cache.Jik);
-    this->cache.dq_desired = this->cache.Jik.inverse() * this->cache.target_velocities;
-}
 
 void StandingControlQP::setFootTransforms() {
     // Set the current foot transforms based on the robot state
@@ -953,18 +865,27 @@ void StandingControlQP::processRadio(VectorXd &radio) {
 }
 
 void StandingControlQP::getDebug(VectorXf &dbg) {
-    dbg << static_cast<float>(ros::Time::now().toSec()), // 1
+    double tsec = static_cast<double>(ros::Time::now().sec);
+    double tnsec = 1e-9 * static_cast<double>(ros::Time::now().nsec);
+    // Move zero to closer time rather than 1970 so it fits in a float
+    // Still bad practice to put time in floats, but this is just for logging
+    if ( !this->config.isSim )
+        tsec -= 1631496319;//1.6074545e9;
+
+    // Use floats for logging size and speed
+    dbg << static_cast<float>(tsec), static_cast<float>(tnsec), // 2
             this->cache.ya.cast <float> (),    // 6
             this->cache.dya.cast <float> (),   // 6
             this->cache.yd.cast <float> (),    // 6
             this->cache.dyd.cast <float> (),   // 6
             this->cache.d2yd.cast <float> (),  // 6
             static_cast<float>(this->cache.V), // 1
-            this->cache.u.cast <float> (),     // 10
-            this->cache.Fdes.cast <float> (),  // 16
+            this->cache.u.cast<float>(),     // 10
+            this->cache.Fdes.cast<float>(),  // 16
             static_cast<float>(this->cache.delta); // 1
     // ndbg = 59
 }
+
 
 int StandingControlQP::InverseKinematics(VectorXd &x) {
     int iteration_limit = this->config.ik_iter_limit;
@@ -1000,3 +921,110 @@ int StandingControlQP::InverseKinematics(VectorXd &x) {
     return -1;
 }
 
+void StandingControlQP::getTorqueID() {
+    VectorXd u(10);
+    VectorXd q_motors(10), dq_motors(10);
+    for (int i = 0; i < this->robot->iRotorMap.size(); ++i) {
+        int ind = this->robot->iRotorMap(i);
+        q_motors(i) = this->robot->q(ind);
+        dq_motors(i) = this->robot->dq(ind);
+    }
+
+    // Compute torques via PD
+    u = this->pd.compute(this->cache.IK_solution, this->cache.dq_desired, q_motors, dq_motors);
+
+    if (this->memory.contact_initialized) {
+        // Feedforward from Inverse Dynamics
+        this->robot->dynamics.calcHandC(this->robot->model, this->robot->q, this->robot->dq);
+        MatrixXd B(22,10);
+        B.setZero();
+        B(LeftHipRoll,0) = 1.;
+        B(LeftHipYaw,1) = 1.;
+        B(LeftHipPitch,2) = 1.;
+        B(LeftKneePitch,3) = 1.;
+        B(LeftFootPitch,4) = 1.;
+        B(RightHipRoll,5) = 1.;
+        B(RightHipYaw,6) = 1.;
+        B(RightHipPitch,7) = 1.;
+        B(RightKneePitch,8) = 1.;
+        B(RightFootPitch,9) = 1.;
+
+        // Compute the robot constraints
+        MatrixXd Jc(14,22);
+        this->robot->kinematics.update(this->robot->model, this->robot->q, this->robot->q);
+        Jc << this->robot->kinematics.cache.J_achilles,
+                this->robot->kinematics.cache.J_rigid,
+                this->robot->kinematics.cache.J_poseLeftConstraint.block(0,0,4,22), // Leave out foot yaw
+                this->robot->kinematics.cache.J_poseRightConstraint.block(0,0,4,22);
+
+        MatrixXd Ge(22,1); Ge.setZero();
+        SymFunction::Ge_cassie_v4(Ge, this->robot->q);
+
+        MatrixXd P(22,22);
+        P = MatrixXd::Identity(22,22) - Jc.completeOrthogonalDecomposition().solve(Jc);
+
+        VectorXd ff(10);
+        MatrixXd PB(22,10);
+        PB = P*B;
+        //ff = PB.completeOrthogonalDecomposition().solve(P) * Ge;
+        ff = PB.completeOrthogonalDecomposition().solve(P) * this->robot->dynamics.C;
+        u += ff;
+
+        // Add a naiive toe regulator...
+        u(4) -= 45. * (this->robot->q(BaseRotY) - this->cache.pitch_desired) + 2. * this->robot->dq(BaseRotY);
+        u(9) -= 45. * (this->robot->q(BaseRotY) - this->cache.pitch_desired) + 2. * this->robot->dq(BaseRotY);
+    }
+    this->cache.u = u;
+}
+
+
+void StandingControlQP::runInverseKinematics(MatrixXd &pLF, MatrixXd &pRF) {
+     // Get desired pelvis position
+     double pdes = this->pitchFilter.getValue();
+     Matrix3d Rot;
+     Rot << cos(pdes), 0, sin(pdes),
+     0, 1, 0,
+     -sin(pdes), 0, cos(pdes);
+     this->cache.T_des_pelvis.matrix().block(0,0,3,3) << Rot;
+
+     VectorXd footDiff(3);
+     footDiff = this->memory.T_leftContact.translation() - this->memory.T_rightContact.translation();
+
+     // X position
+     this->cache.T_des_leftFoot(0,3)  = -footDiff(0) - this->cache.yd(0);
+     this->cache.T_des_rightFoot(0,3) =  footDiff(0) - this->cache.yd(0);
+
+     // Y position
+     this->cache.T_des_leftFoot(1,3)  =  footDiff(1) / 2. - this->cache.yd(1);
+     this->cache.T_des_rightFoot(1,3) = -footDiff(1) / 2. - this->cache.yd(1);
+
+     // Z position
+     double roll  = this->robot->q(3);
+     double droll = this->robot->dq(3);
+     double lateralStabilizer = 0.0;
+     if (this->config.use_lateral_comp)
+         lateralStabilizer = this->memory.spoolup * (this->config.Kp_lateral_compensator * roll + this->config.Kd_lateral_compensator * droll);
+     this->cache.T_des_leftFoot(2,3)  = -this->cache.yd(2)  + lateralStabilizer / 2.0;
+     this->cache.T_des_rightFoot(2,3) = -this->cache.yd(2) - lateralStabilizer / 2.0;
+
+     // Set residual function target
+     double footpitch_target = 0.0;
+     this->IKfunction.setTarget(this->cache.T_des_pelvis,
+                                this->cache.T_des_leftFoot, footpitch_target,
+                                this->cache.T_des_rightFoot, footpitch_target);
+
+     // Solve the IK problem - uses current state as the initial guess
+     int iksuccess = this->InverseKinematics(this->cache.IK_solution);
+     if (iksuccess < 0) {
+         // Don't use solution if it failed ...
+         // Just do what the last command was
+         this->cache.IK_solution << this->memory.IK_solution_prev;
+     }
+
+     // Compute the desired velocities
+     this->cache.target_velocities << this->cache.dyd.segment(0,3),  0.0, -this->cache.dyd(4),
+     this->cache.dyd.segment(0,3),  0.0, -this->cache.dyd(4);
+
+     this->IKfunction.df(this->cache.IK_solution, this->cache.Jik);
+     this->cache.dq_desired = this->cache.Jik.inverse() * this->cache.target_velocities;
+ }

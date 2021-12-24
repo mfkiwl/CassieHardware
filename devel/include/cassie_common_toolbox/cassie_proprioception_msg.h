@@ -40,7 +40,8 @@ struct cassie_proprioception_msg_
     , linear_acceleration()
     , q_achilles()
     , dq_achilles()
-    , contact()  {
+    , contact()
+    , isCalibrated(false)  {
       radio.assign(0.0);
 
       motor_torque.assign(0.0);
@@ -67,7 +68,8 @@ struct cassie_proprioception_msg_
     , linear_acceleration(_alloc)
     , q_achilles()
     , dq_achilles()
-    , contact()  {
+    , contact()
+    , isCalibrated(false)  {
   (void)_alloc;
       radio.assign(0.0);
 
@@ -122,6 +124,9 @@ struct cassie_proprioception_msg_
    typedef boost::array<double, 2>  _contact_type;
   _contact_type contact;
 
+   typedef uint8_t _isCalibrated_type;
+  _isCalibrated_type isCalibrated;
+
 
 
 
@@ -162,7 +167,8 @@ bool operator==(const ::cassie_common_toolbox::cassie_proprioception_msg_<Contai
     lhs.linear_acceleration == rhs.linear_acceleration &&
     lhs.q_achilles == rhs.q_achilles &&
     lhs.dq_achilles == rhs.dq_achilles &&
-    lhs.contact == rhs.contact;
+    lhs.contact == rhs.contact &&
+    lhs.isCalibrated == rhs.isCalibrated;
 }
 
 template<typename ContainerAllocator1, typename ContainerAllocator2>
@@ -219,12 +225,12 @@ struct MD5Sum< ::cassie_common_toolbox::cassie_proprioception_msg_<ContainerAllo
 {
   static const char* value()
   {
-    return "6f2b82c0e07a0ccde1e150112cb04100";
+    return "3be1623c7974da649675ad63828eb904";
   }
 
   static const char* value(const ::cassie_common_toolbox::cassie_proprioception_msg_<ContainerAllocator>&) { return value(); }
-  static const uint64_t static_value1 = 0x6f2b82c0e07a0ccdULL;
-  static const uint64_t static_value2 = 0xe1e150112cb04100ULL;
+  static const uint64_t static_value1 = 0x3be1623c7974da64ULL;
+  static const uint64_t static_value2 = 0x9675ad63828eb904ULL;
 };
 
 template<class ContainerAllocator>
@@ -255,6 +261,8 @@ struct Definition< ::cassie_common_toolbox::cassie_proprioception_msg_<Container
 "float64[2]               q_achilles\n"
 "float64[2]               dq_achilles\n"
 "float64[2]               contact\n"
+"bool                     isCalibrated\n"
+"\n"
 "\n"
 "================================================================================\n"
 "MSG: std_msgs/Header\n"
@@ -323,6 +331,7 @@ namespace serialization
       stream.next(m.q_achilles);
       stream.next(m.dq_achilles);
       stream.next(m.contact);
+      stream.next(m.isCalibrated);
     }
 
     ROS_DECLARE_ALLINONE_SERIALIZER
@@ -398,6 +407,8 @@ struct Printer< ::cassie_common_toolbox::cassie_proprioception_msg_<ContainerAll
       s << indent << "  contact[" << i << "]: ";
       Printer<double>::stream(s, indent + "  ", v.contact[i]);
     }
+    s << indent << "isCalibrated: ";
+    Printer<uint8_t>::stream(s, indent + "  ", v.isCalibrated);
   }
 };
 

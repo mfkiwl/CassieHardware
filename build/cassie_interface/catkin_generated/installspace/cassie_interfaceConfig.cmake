@@ -99,7 +99,7 @@ if(NOT "include " STREQUAL " ")
   elseif(NOT " " STREQUAL " ")
     set(_report "Check the website '' for information and consider reporting the problem.")
   else()
-    set(_report "Report the problem to the maintainer 'Jenna Reher <jreher@caltech.edu>' and request to fix the problem.")
+    set(_report "Report the problem to the maintainer 'Jane Doe <jane.doe@example.com>' and request to fix the problem.")
   endif()
   foreach(idir ${_include_dirs})
     if(IS_ABSOLUTE ${idir} AND IS_DIRECTORY ${idir})
@@ -154,7 +154,7 @@ foreach(library ${libraries})
     set(lib_path "")
     set(lib "${library}-NOTFOUND")
     # since the path where the library is found is returned we have to iterate over the paths manually
-    foreach(path /home/xiaobin/cassie_ws/install/lib;/opt/ros/melodic/lib)
+    foreach(path /home/xiaobin/cassie_ws/install/lib;/home/xiaobin/robot_local_ws/devel/lib;/home/xiaobin/catkin_ws/devel/lib;/home/xiaobin/cassie_ws/devel/lib;/opt/ros/melodic/lib)
       find_library(lib ${library}
         PATHS ${path}
         NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)

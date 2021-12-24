@@ -1,0 +1,69 @@
+<?xml version="1.0" ?>
+<launch>
+
+
+<!-- GAZEBO RELATED SIMULATION LAUNCH FILE  -->
+
+<arg name="world_name" value="$(find cassie_description)/cassie/cassie_empty.world"/>
+<arg name="paused" value="true"/>
+<arg name="use_sim_time" value="true"/>
+<arg name="recording" value="false"/>
+<arg name="gui" value="true"/>
+<arg name="headless" value="false"/>
+<arg name="extra_gazebo_args" value=""/>
+<arg name="verbose" value="true"/>
+<arg name="physics" value="ode"/>
+
+<!-- set command arguments -->
+<arg unless="$(arg paused)" name="command_arg1" value=""/>
+<arg     if="$(arg paused)" name="command_arg1" value="-u"/>
+<arg unless="$(arg recording)" name="command_arg2" value=""/>
+<arg     if="$(arg recording)" name="command_arg2" value="-r"/>
+<arg unless="$(arg verbose)" name="command_arg3" value=""/>
+<arg     if="$(arg verbose)" name="command_arg3" value="--verbose"/>
+
+<!-- Launch Gazebo -->
+<node name="gazebo" pkg="gazebo_ros" type="gazebo" respawn="false" output="screen"
+        args="$(arg command_arg1) $(arg command_arg2) $(arg command_arg3) $(arg world_name) $(arg use_sim_time)" />
+
+<!-- Spawn Cassie into Gazebo -->
+<!-- <node name="spawn_sdf" pkg="gazebo_ros" type="spawn_model" args="-file $(find cassie_description)/cassie/cassie_rigid.sdf -sdf -model cassie -x 0.0 -y 0.0 -z 0.2"/> -->
+
+<node name="spawn_sdf" pkg="gazebo_ros" type="spawn_model" args="-file $(find cassie_description)/cassie/cassie_stiff.sdf -sdf -model cassie -x 0.0 -y 0.0 -z 0.2"/>
+
+<!-- Enable robot_description for RViz -->
+<param name="robot_description" command="cat $(find cassie_description)/urdf/cassie_v4.urdf" />
+
+
+
+
+
+
+
+
+<!-- <node name="spawn_stone" pkg="gazebo_ros" type="spawn_model" args="-sdf -file $(find cassie_interface)/launch/stepping_stone/model.sdf -model stone     -x 0.0 -z 0" respawn="false"  output="screen" /> -->
+<!-- <node name="spawn_stone_2" pkg="gazebo_ros" type="spawn_model" args="-sdf -file $(find cassie_interface)/launch/stepping_stone/model.sdf -model stone_2 -x -0.15 -z 0" respawn="false" output="screen" /> -->
+<!-- <node name="spawn_stone_3" pkg="gazebo_ros" type="spawn_model" args="-sdf -file $(find cassie_interface)/launch/stepping_stone/model.sdf -model stone_3 -x 0.2 -z 0" respawn="false" output="screen" /> -->
+<!-- <node name="spawn_stone_5" pkg="gazebo_ros" type="spawn_model" args="-sdf -file $(find cassie_interface)/launch/stepping_stone/model.sdf -model stone_5 -x 0.4 -z 0" respawn="false" output="screen" /> -->
+<!-- <node name="spawn_stone_6" pkg="gazebo_ros" type="spawn_model" args="-sdf -file $(find cassie_interface)/launch/stepping_stone/model.sdf -model stone_6 -x 0.68 -z 0" respawn="false" output="screen" /> -->
+<!-- <node name="spawn_stone_7" pkg="gazebo_ros" type="spawn_model" args="-sdf -file $(find cassie_interface)/launch/stepping_stone/model.sdf -model stone_7 -x 0.8 -z 0" respawn="false" output="screen" /> -->
+<!-- <node name="spawn_stone_8" pkg="gazebo_ros" type="spawn_model" args="-sdf -file $(find cassie_interface)/launch/stepping_stone/model.sdf -model stone_8 -x 1.12 -z 0" respawn="false" output="screen" /> -->
+
+<!-- <node name="spawn_stone_10" pkg="gazebo_ros" type="spawn_model" args="-sdf -file $(find cassie_interface)/launch/stepping_stone/model.sdf -model stone_10 -x 1.4 -z 0" respawn="false" output="screen" /> -->
+<!-- <node name="spawn_stone_11" pkg="gazebo_ros" type="spawn_model" args="-sdf -file $(find cassie_interface)/launch/stepping_stone/model.sdf -model stone_11 -x 1.8 -z 0" respawn="false" output="screen" /> -->
+<!-- <node name="spawn_stone_12" pkg="gazebo_ros" type="spawn_model" args="-sdf -file $(find cassie_interface)/launch/stepping_stone/model.sdf -model stone_12 -x 2.1 -z 0" respawn="false" output="screen" /> -->
+<!-- <node name="spawn_stone_13" pkg="gazebo_ros" type="spawn_model" args="-sdf -file $(find cassie_interface)/launch/stepping_stone/model.sdf -model stone_13 -x 2.6 -z 0" respawn="false" output="screen" /> -->
+<!-- <node name="spawn_stone_14" pkg="gazebo_ros" type="spawn_model" args="-sdf -file $(find cassie_interface)/launch/stepping_stone/model.sdf -model stone_14 -x 2.9 -z 0" respawn="false"  output="screen" /> -->
+<!-- <node name="spawn_stone_15" pkg="gazebo_ros" type="spawn_model" args="-sdf -file $(find cassie_interface)/launch/stepping_stone/model.sdf -model stone_15 -x 3.35 -z 0" respawn="false" output="screen" /> -->
+<!-- <node name="spawn_stone_16" pkg="gazebo_ros" type="spawn_model" args="-sdf -file $(find cassie_interface)/launch/stepping_stone/model.sdf -model stone_16 -x 3.7 -z 0" respawn="false" output="screen" /> -->
+<!-- <node name="spawn_stone_18" pkg="gazebo_ros" type="spawn_model" args="-sdf -file $(find cassie_interface)/launch/stepping_stone/model.sdf -model stone_18 -x 4.1 -z 0" respawn="false" output="screen" /> -->
+<!-- <node name="spawn_stone_19" pkg="gazebo_ros" type="spawn_model" args="-sdf -file $(find cassie_interface)/launch/stepping_stone/model.sdf -model stone_19 -x 4.3 -z 0" respawn="false"  output="screen" /> -->
+
+<!-- <node name="spawn_stone_21" pkg="gazebo_ros" type="spawn_model" args="-sdf -file $(find cassie_interface)/launch/stepping_stone/model.sdf -model stone_21 -x 6.5 -z 0" respawn="false" output="screen" /> -->
+<!-- <node name="spawn_stone_22" pkg="gazebo_ros" type="spawn_model" args="-sdf -file $(find cassie_interface)/launch/stepping_stone/model.sdf -model stone_22 -x 6.85 -z 0" respawn="false" output="screen" /> -->
+
+
+<!-- <node name="spawn_stone_long" pkg="gazebo_ros" type="spawn_model" args="-sdf -file $(find cassie_interface)/launch/stepping_stone_long/model.sdf -model stone_long -x 11.6 -z 0" respawn="false" output="screen" /> -->
+
+
+</launch>

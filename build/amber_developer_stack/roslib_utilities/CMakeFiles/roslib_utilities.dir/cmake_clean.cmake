@@ -1,7 +1,8 @@
 file(REMOVE_RECURSE
-  "CMakeFiles/roslib_utilities.dir/src/ros_package_utilities.cpp.o"
   "/home/xiaobin/cassie_ws/devel/lib/libroslib_utilities.pdb"
   "/home/xiaobin/cassie_ws/devel/lib/libroslib_utilities.so"
+  "CMakeFiles/roslib_utilities.dir/src/ros_package_utilities.cpp.o"
+  "CMakeFiles/roslib_utilities.dir/src/ros_package_utilities.cpp.o.d"
 )
 
 # Per-language clean rules from dependency scanning.

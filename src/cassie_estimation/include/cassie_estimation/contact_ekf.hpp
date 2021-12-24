@@ -30,6 +30,7 @@ public:
     void getValues(Matrix3d &R, Vector3d &p, Vector3d &v, Vector3d &ba, Vector3d &bg, Vector3d &plf, Vector3d &prf, Vector2d &footYaws);
     Vector3d getRawVelocity();
     bool isEnabled();
+
 private:
     /**
     * @brief Computations that can be reproduced given a Config and Memory object

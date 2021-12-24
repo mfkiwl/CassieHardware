@@ -32,6 +32,7 @@ class cassie_proprioception_msg {
       this.q_achilles = null;
       this.dq_achilles = null;
       this.contact = null;
+      this.isCalibrated = null;
     }
     else {
       if (initObj.hasOwnProperty('header')) {
@@ -106,6 +107,12 @@ class cassie_proprioception_msg {
       else {
         this.contact = new Array(2).fill(0);
       }
+      if (initObj.hasOwnProperty('isCalibrated')) {
+        this.isCalibrated = initObj.isCalibrated
+      }
+      else {
+        this.isCalibrated = false;
+      }
     }
   }
 
@@ -163,6 +170,8 @@ class cassie_proprioception_msg {
     }
     // Serialize message field [contact]
     bufferOffset = _arraySerializer.float64(obj.contact, buffer, bufferOffset, 2);
+    // Serialize message field [isCalibrated]
+    bufferOffset = _serializer.bool(obj.isCalibrated, buffer, bufferOffset);
     return bufferOffset;
   }
 
@@ -194,13 +203,15 @@ class cassie_proprioception_msg {
     data.dq_achilles = _arrayDeserializer.float64(buffer, bufferOffset, 2)
     // Deserialize message field [contact]
     data.contact = _arrayDeserializer.float64(buffer, bufferOffset, 2)
+    // Deserialize message field [isCalibrated]
+    data.isCalibrated = _deserializer.bool(buffer, bufferOffset);
     return data;
   }
 
   static getMessageSize(object) {
     let length = 0;
     length += std_msgs.msg.Header.getMessageSize(object.header);
-    return length + 584;
+    return length + 585;
   }
 
   static datatype() {
@@ -210,7 +221,7 @@ class cassie_proprioception_msg {
 
   static md5sum() {
     //Returns md5sum for a message object
-    return '6f2b82c0e07a0ccde1e150112cb04100';
+    return '3be1623c7974da649675ad63828eb904';
   }
 
   static messageDefinition() {
@@ -228,6 +239,8 @@ class cassie_proprioception_msg {
     float64[2]               q_achilles
     float64[2]               dq_achilles
     float64[2]               contact
+    bool                     isCalibrated
+    
     
     ================================================================================
     MSG: std_msgs/Header
@@ -357,6 +370,13 @@ class cassie_proprioception_msg {
     }
     else {
       resolved.contact = new Array(2).fill(0)
+    }
+
+    if (msg.isCalibrated !== undefined) {
+      resolved.isCalibrated = msg.isCalibrated;
+    }
+    else {
+      resolved.isCalibrated = false
     }
 
     return resolved;

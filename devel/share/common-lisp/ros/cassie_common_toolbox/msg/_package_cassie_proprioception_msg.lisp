@@ -23,4 +23,6 @@
           DQ_ACHILLES
           CONTACT-VAL
           CONTACT
+          ISCALIBRATED-VAL
+          ISCALIBRATED
 ))

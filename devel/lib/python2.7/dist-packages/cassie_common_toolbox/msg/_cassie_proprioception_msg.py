@@ -10,7 +10,7 @@ import geometry_msgs.msg
 import std_msgs.msg
 
 class cassie_proprioception_msg(genpy.Message):
-  _md5sum = "6f2b82c0e07a0ccde1e150112cb04100"
+  _md5sum = "3be1623c7974da649675ad63828eb904"
   _type = "cassie_common_toolbox/cassie_proprioception_msg"
   _has_header = True  # flag to mark the presence of a Header object
   _full_text = """Header                   header
@@ -25,6 +25,8 @@ geometry_msgs/Vector3    linear_acceleration
 float64[2]               q_achilles
 float64[2]               dq_achilles
 float64[2]               contact
+bool                     isCalibrated
+
 
 ================================================================================
 MSG: std_msgs/Header
@@ -63,8 +65,8 @@ MSG: geometry_msgs/Vector3
 float64 x
 float64 y
 float64 z"""
-  __slots__ = ['header','radio','motor_torque','encoder_position','encoder_velocity','orientation','angular_velocity','linear_velocity','linear_acceleration','q_achilles','dq_achilles','contact']
-  _slot_types = ['std_msgs/Header','float64[16]','float64[10]','float64[14]','float64[14]','geometry_msgs/Quaternion','geometry_msgs/Vector3','geometry_msgs/Vector3','geometry_msgs/Vector3','float64[2]','float64[2]','float64[2]']
+  __slots__ = ['header','radio','motor_torque','encoder_position','encoder_velocity','orientation','angular_velocity','linear_velocity','linear_acceleration','q_achilles','dq_achilles','contact','isCalibrated']
+  _slot_types = ['std_msgs/Header','float64[16]','float64[10]','float64[14]','float64[14]','geometry_msgs/Quaternion','geometry_msgs/Vector3','geometry_msgs/Vector3','geometry_msgs/Vector3','float64[2]','float64[2]','float64[2]','bool']
 
   def __init__(self, *args, **kwds):
     """
@@ -74,7 +76,7 @@ float64 z"""
     changes.  You cannot mix in-order arguments and keyword arguments.
 
     The available fields are:
-       header,radio,motor_torque,encoder_position,encoder_velocity,orientation,angular_velocity,linear_velocity,linear_acceleration,q_achilles,dq_achilles,contact
+       header,radio,motor_torque,encoder_position,encoder_velocity,orientation,angular_velocity,linear_velocity,linear_acceleration,q_achilles,dq_achilles,contact,isCalibrated
 
     :param args: complete set of field values, in .msg order
     :param kwds: use keyword arguments corresponding to message field names
@@ -107,6 +109,8 @@ float64 z"""
         self.dq_achilles = [0.] * 2
       if self.contact is None:
         self.contact = [0.] * 2
+      if self.isCalibrated is None:
+        self.isCalibrated = False
     else:
       self.header = std_msgs.msg.Header()
       self.radio = [0.] * 16
@@ -120,6 +124,7 @@ float64 z"""
       self.q_achilles = [0.] * 2
       self.dq_achilles = [0.] * 2
       self.contact = [0.] * 2
+      self.isCalibrated = False
 
   def _get_types(self):
     """
@@ -150,6 +155,8 @@ float64 z"""
       buff.write(_get_struct_2d().pack(*self.q_achilles))
       buff.write(_get_struct_2d().pack(*self.dq_achilles))
       buff.write(_get_struct_2d().pack(*self.contact))
+      _x = self.isCalibrated
+      buff.write(_get_struct_B().pack(_x))
     except struct.error as se: self._check_types(struct.error("%s: '%s' when writing '%s'" % (type(se), str(se), str(locals().get('_x', self)))))
     except TypeError as te: self._check_types(ValueError("%s: '%s' when writing '%s'" % (type(te), str(te), str(locals().get('_x', self)))))
 
@@ -210,6 +217,10 @@ float64 z"""
       start = end
       end += 16
       self.contact = _get_struct_2d().unpack(str[start:end])
+      start = end
+      end += 1
+      (self.isCalibrated,) = _get_struct_B().unpack(str[start:end])
+      self.isCalibrated = bool(self.isCalibrated)
       return self
     except struct.error as e:
       raise genpy.DeserializationError(e)  # most likely buffer underfill
@@ -239,6 +250,8 @@ float64 z"""
       buff.write(self.q_achilles.tostring())
       buff.write(self.dq_achilles.tostring())
       buff.write(self.contact.tostring())
+      _x = self.isCalibrated
+      buff.write(_get_struct_B().pack(_x))
     except struct.error as se: self._check_types(struct.error("%s: '%s' when writing '%s'" % (type(se), str(se), str(locals().get('_x', self)))))
     except TypeError as te: self._check_types(ValueError("%s: '%s' when writing '%s'" % (type(te), str(te), str(locals().get('_x', self)))))
 
@@ -300,6 +313,10 @@ float64 z"""
       start = end
       end += 16
       self.contact = numpy.frombuffer(str[start:end], dtype=numpy.float64, count=2)
+      start = end
+      end += 1
+      (self.isCalibrated,) = _get_struct_B().unpack(str[start:end])
+      self.isCalibrated = bool(self.isCalibrated)
       return self
     except struct.error as e:
       raise genpy.DeserializationError(e)  # most likely buffer underfill
@@ -344,3 +361,9 @@ def _get_struct_3I():
     if _struct_3I is None:
         _struct_3I = struct.Struct("<3I")
     return _struct_3I
+_struct_B = None
+def _get_struct_B():
+    global _struct_B
+    if _struct_B is None:
+        _struct_B = struct.Struct("<B")
+    return _struct_B

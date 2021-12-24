@@ -1,7 +1,3 @@
-/**
- * @author Jenna Reher <jreher@caltech.edu>, member of Dr. Aaron Ames's AMBER Lab
- */
-
 #ifndef _ROS_UTILITIES_TIMING_H
 #define _ROS_UTILITIES_TIMING_H
 

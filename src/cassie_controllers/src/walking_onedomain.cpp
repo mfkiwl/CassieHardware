@@ -386,7 +386,7 @@ Walking1DControl::Walking1DControl(ros::NodeHandle &nh, cassie_model::Cassie &ro
     this->config.init();
 
     // Service for calling reconfigures
-    this->reconfigureService = nh.advertiseService("reconfigure_qp_stepping", &Walking1DControl::reconfigure, this);
+//    this->reconfigureService = nh.advertiseService("reconfigure_qp_stepping", &Walking1DControl::reconfigure, this);
     this->reconfigure();
 }
 
@@ -421,6 +421,7 @@ bool Walking1DControl::reconfigure() {
     this->config.paramChecker.checkAndUpdate("raibert/KdY", this->config.raibert_KdY);
     this->config.paramChecker.checkAndUpdate("raibert/KiX", this->config.raibert_KiX);
     this->config.paramChecker.checkAndUpdate("raibert/KiY", this->config.raibert_KiY);
+    this->config.paramChecker.checkAndUpdate("raibert/phaseThreshold", this->config.raibert_phaseThreshold);
 
     this->config.paramChecker.checkAndUpdate("acceleration_regulation/ddq_KpX", this->config.ddq_KpX);
     this->config.paramChecker.checkAndUpdate("acceleration_regulation/ddq_KdX", this->config.ddq_KdX);
@@ -450,11 +451,6 @@ bool Walking1DControl::reconfigure() {
     this->config.reconfigure();
     this->phase.reconfigure(this->config.gaitlib.phaseRange, this->config.time_scale);
 
-    return true;
-}
-
-bool Walking1DControl::reconfigure(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res) {
-    this->reconfigure();
     return true;
 }
 
@@ -608,7 +604,8 @@ void Walking1DControl::update(VectorXd &radio, VectorXd &u) {
     this->computeGuard(requestTransition);
 
     // Return
-    this->memory.lastTau = this->phase.tau;
+    this->memory.lastTau = this->phase.tau; //not used
+
     u = this->cache.u;
 
     // Update velocity average for step
@@ -618,8 +615,225 @@ void Walking1DControl::update(VectorXd &radio, VectorXd &u) {
 }
 
 VectorXd Walking1DControl::getTorqueQP() {
-    // NOT YET RELEASED
-    this->cache.u.setZero();
+    // Output error
+    VectorXd eta(18);
+    eta << this->cache.ya - this->cache.yd,
+            this->cache.dya - this->cache.dyd;
+
+    // Formulate the QP
+    // States are X = [ddq; u; F; delta] \in \mathbb{R}^{40}
+    // Compute model dynamics
+    MatrixXd Fs(22,1); Fs.setZero();
+    Fs(LeftShinPitch) = -this->robot->q(LeftShinPitch) * 2300.;
+    Fs(LeftHeelSpring) = -this->robot->q(LeftHeelSpring) * 2000.;
+    Fs(RightShinPitch) = -this->robot->q(RightShinPitch) * 2300.; //*0.95
+    Fs(RightHeelSpring) = -this->robot->q(RightHeelSpring) * 2000.;
+    this->robot->dynamics.calcHandC(this->robot->model, this->robot->q, this->robot->dq);
+
+    MatrixXd Ge(22,1); Ge.setZero();
+    SymFunction::Ge_cassie_v4(Ge, this->robot->q);
+
+    // Compute the robot constraints
+    double gravScale = 0.;
+    this->robot->kinematics.update(this->robot->model, this->robot->q, this->robot->dq);
+    if (this->memory.iDomain == 0) {
+        gravScale = this->config.right_stance_gravity_scale;
+        this->cache.Jc << this->robot->kinematics.cache.J_achilles,
+                          this->robot->kinematics.cache.J_rigid.block(0,0,2,22);
+        this->cache.dJc << this->robot->kinematics.cache.Jdot_achilles,
+                           this->robot->kinematics.cache.Jdot_rigid.block(0,0,2,22);
+        this->cache.Js << this->robot->kinematics.cache.J_poseRightConstraint,
+                          this->robot->kinematics.cache.J_rigid.block(2,0,2,22);
+        this->cache.dJs << this->robot->kinematics.cache.Jdot_poseRightConstraint,
+                           this->robot->kinematics.cache.Jdot_rigid.block(2,0,2,22);
+    } else {
+        gravScale = this->config.left_stance_gravity_scale;
+        this->cache.Jc << this->robot->kinematics.cache.J_achilles,
+                          this->robot->kinematics.cache.J_rigid.block(2,0,2,22);
+        this->cache.dJc << this->robot->kinematics.cache.Jdot_achilles,
+                           this->robot->kinematics.cache.Jdot_rigid.block(2,0,2,22);
+        this->cache.Js << this->robot->kinematics.cache.J_poseLeftConstraint,
+                          this->robot->kinematics.cache.J_rigid.block(0,0,2,22);
+        this->cache.dJs << this->robot->kinematics.cache.Jdot_poseLeftConstraint,
+                           this->robot->kinematics.cache.Jdot_rigid.block(0,0,2,22);
+    }
+    this->cache.Jcs  << this->cache.Jc, this->cache.Js;
+    this->cache.dJcs << this->cache.dJc, this->cache.dJs;
+    this->robot->dynamics.C = this->robot->dynamics.C - (1. - gravScale) * Ge;
+
+    // Compute constrained dynamics
+    this->cache.Proj = MatrixXd::Identity(22,22) - this->cache.Jc.completeOrthogonalDecomposition().solve(this->cache.Jc);
+    this->cache.Aconstr.block(0,0,22,22)   << this->robot->dynamics.H + this->cache.Proj*this->robot->dynamics.H - (this->cache.Proj*this->robot->dynamics.H).transpose();
+    this->cache.Aconstr.block(0,22, 22,10) << - this->cache.Proj*this->config.Be;
+    this->cache.Aconstr.block(0,32, 22,7)  << - this->cache.Proj*this->cache.Js.transpose();
+    this->cache.lbA.segment(0,22) = - this->cache.Proj*this->robot->dynamics.C + (- this->robot->dynamics.H * this->cache.Jc.completeOrthogonalDecomposition().solve(this->cache.dJc))*this->robot->dq;
+    this->cache.ubA.segment(0,22) = this->cache.lbA.segment(0,22);
+
+    // Friction cone
+    MatrixXd PyramidFull(9,9);
+    PyramidFull.setZero();
+    PyramidFull.block(0,0, 9,5) << this->config.contact_pyramid;
+    this->cache.Aconstr.block(22, 32, 9,5) = this->config.contact_pyramid;
+    this->cache.lbA.segment(22,9).setConstant(-INFTY); // -inf
+    this->cache.ubA.segment(22,9).setZero();
+
+    // CLF Terms
+    MatrixXd Y  = this->cache.Dya.block(0,0,9,22) * (MatrixXd::Identity(22,22) - this->cache.Jcs.completeOrthogonalDecomposition().solve(this->cache.Jcs));
+    MatrixXd dY = this->cache.DLfya.block(0,0,9,22) + this->cache.Dya.block(0,0,9,22) * this->cache.Jcs.completeOrthogonalDecomposition().solve(this->cache.dJcs);
+    this->cache.V = eta.transpose() * this->config.P * eta;
+    double LFV = eta.transpose() * this->config.LFV_mat * eta;
+    MatrixXd LGV(1,9);
+    LGV << 2. * eta.transpose() * this->config.P * this->config.G;
+    double LGVpsi1 = (LGV* (dY * this->robot->dq - Y*this->cache.ddqd)).value();
+
+    // CLF Inequality
+    this->cache.Aconstr.block(31,0,1,22) = LGV * Y;
+    this->cache.Aconstr(31,39) = -1.;
+    this->cache.lbA(31) = -INFTY;
+    this->cache.ubA(31) = +INFTY;
+    if (this->config.clf_use_inequality)
+        this->cache.ubA(31) = - this->config.gam * this->cache.V - LFV - LGVpsi1;
+
+    // Build all constraint matrices
+    // Zero stance foot torque
+    if (this->memory.iDomain == 0) {
+        // Right Stance
+        this->config.lb(22+10 - 1) = 0.;
+        this->config.ub(22+10 - 1) = 0.;
+
+        this->config.lb(22+5 - 1) = -this->config.torque_bounds(4);
+        this->config.ub(22+5 - 1) =  this->config.torque_bounds(4);
+    } else {
+        // Left Stance
+        this->config.lb(22+5 - 1) = 0.;
+        this->config.ub(22+5 - 1) = 0.;
+
+        this->config.lb(22+10 - 1) = -this->config.torque_bounds(9);
+        this->config.ub(22+10 - 1) =  this->config.torque_bounds(9);
+    }
+
+    // Construct the cost
+    // 0.5*x'*H*x + f'*x
+    // Task space terms
+    this->cache.b_y = Y*this->cache.ddqd - dY * this->robot->dq;
+    if (config.clf_use_task_pd)
+        this->cache.b_y -= (this->config.Kpy.cwiseProduct(eta.segment(0,9)) + this->config.Kdy.cwiseProduct(eta.segment(9,9)));
+
+    // Regularization values
+    VectorXd reg_ddq(22);
+    if (this->memory.iDomain == 0)
+        reg_ddq << this->config.reg_base_ddq, this->config.reg_swing_ddq, this->config.reg_stance_ddq;
+    else
+        reg_ddq << this->config.reg_base_ddq, this->config.reg_stance_ddq, this->config.reg_swing_ddq;
+
+    VectorXd reg_u(10);
+    if (this->memory.iDomain == 0) {
+        // Use PD controller to add model-free feedback on floating base and swing foot
+        this->cache.uff(5) +=  2.;
+        reg_u << this->config.reg_swing_u, this->config.reg_stance_u;
+    }
+    else {
+        // Use PD controller to add model-free feedback on floating base and swing foot
+        this->cache.uff(0) += -2.;
+        reg_u << this->config.reg_stance_u, this->config.reg_swing_u;
+    }
+
+    VectorXd reg_Fs(7);
+    reg_Fs << this->config.reg_fx, this->config.reg_fy, this->config.reg_fz,
+              this->config.reg_muy, this->config.reg_muz,
+              this->config.reg_rigid * VectorXd::Ones(2);
+
+    VectorXd Fd(7);
+    Fd << this->cache.Fd.segment(2,5), this->cache.Js.block(5,0,2,22) * Fs;
+    Fd(5) *= this->config.force_sp_scale;
+    Fd(6) *= this->config.force_sp_scale;
+
+    VectorXd w_s(7);
+    w_s << this->config.w_hol_fx, this->config.w_hol_fy, this->config.w_hol_fz,
+            this->config.w_hol_my, this->config.w_hol_mz,
+            this->config.w_hol_fixed * VectorXd::Ones(2);
+
+    // Build the final QP formulation
+    // Pow the regularization weights
+    for (int i=0; i<reg_ddq.size(); i++)
+        reg_ddq(i) = pow(reg_ddq(i),2);
+    for (int i=0; i<reg_u.size(); i++)
+        reg_u(i) = pow(reg_u(i),2);
+    for (int i=0; i<reg_Fs.size(); i++)
+        reg_Fs(i) = pow(reg_Fs(i),2);
+
+    // Compute the upper left corner for the accelerations
+    MatrixXd Gddq_block(22,22);
+    Gddq_block = (Y.transpose() * Y) * pow(this->config.w_outputs,2) +
+                 ( this->cache.Js.transpose() * w_s.asDiagonal() ) * ( this->cache.Js.transpose() * w_s.asDiagonal() ).transpose() +
+                 MatrixXd::Identity(22,22) * reg_ddq.asDiagonal();
+    this->cache.G.block(0,0,22,22) = Gddq_block;
+    for (int i=0; i<10; i++)
+        this->cache.G(22+i,22+i) = reg_u(i);
+    for (int i=0; i<7; i++)
+        this->cache.G(32+i,32+i) = reg_Fs(i);
+    this->cache.G(39,39) = pow(this->config.reg_clf_delta,2);
+
+    // Compute linear terms in cost
+    this->cache.g.setZero();
+    this->cache.g << - pow(this->config.w_outputs,2) * Y.transpose() * this->cache.b_y
+                            + ( this->cache.Js.transpose() * w_s.asDiagonal() ) * ( (this->cache.dJs * this->robot->dq).transpose() * w_s.asDiagonal() ).transpose()
+                            - reg_ddq.cwiseProduct(this->cache.ddqd),
+                     - reg_u.cwiseProduct(this->cache.uff),
+                     - reg_Fs.cwiseProduct(Fd),
+                     0.0;
+
+    // Add the Lyapunov gradient if flagged
+    if (this->config.clf_use_Vdot_cost)
+        this->cache.g.segment(0,22) += this->config.w_Vdot * (LGV * Y).transpose();
+
+    // Flatten matrices in row-major format.
+    Map<VectorXd> Gflat(this->cache.G.data(), this->cache.G.size());
+    //Map<VectorXd> Gflat(G.data(), G.size());
+    Map<VectorXd> AConstrFlat(this->cache.Aconstr.data(), this->cache.Aconstr.size());
+
+    // Run the QP
+    qpOASES::returnValue success = RET_QP_NOT_SOLVED;
+    int_t nWSR = this->config.nQPIter;
+    if (this->memory.qp_initialized) {
+        success = this->qpsolver->hotstart(static_cast<real_t*>(Gflat.data()), static_cast<real_t*>(this->cache.g.data()),
+                                           static_cast<real_t*>(AConstrFlat.data()),
+                                           static_cast<real_t*>(this->config.lb.data()), static_cast<real_t*>(this->config.ub.data()),
+                                           static_cast<real_t*>(this->cache.lbA.data()),static_cast<real_t*>(this->cache.ubA.data()),
+                                           nWSR );
+    } else {
+        success = this->qpsolver->init(static_cast<real_t*>(Gflat.data()), static_cast<real_t*>(this->cache.g.data()),
+                                       static_cast<real_t*>(AConstrFlat.data()),
+                                       static_cast<real_t*>(this->config.lb.data()), static_cast<real_t*>(this->config.ub.data()),
+                                       static_cast<real_t*>(this->cache.lbA.data()),static_cast<real_t*>(this->cache.ubA.data()),
+                                       nWSR );
+        this->memory.qp_initialized = true;
+    }
+
+    // Get solution
+    this->cache.qpsol.setZero();
+    this->qpsolver->getPrimalSolution(static_cast<real_t*>(this->cache.qpsol.data()));
+    if (success != SUCCESSFUL_RETURN) {
+        ROS_WARN("THE QP DID NOT CONVERGE!");
+        this->qpsolver->reset();
+        this->memory.qp_initialized = false;
+        this->memory.u_prev.setZero();
+    } else {
+        this->memory.u_prev << this->cache.qpsol.segment(22,10);
+        this->cache.u << this->cache.qpsol.segment(22,10);
+    }
+
+    this->cache.ddqtar << this->cache.qpsol.segment(0,22);
+    this->cache.Fdes << this->cache.Jc.transpose().completeOrthogonalDecomposition().solve((MatrixXd::Identity(22,22) - this->cache.Proj)*this->robot->dynamics.H*this->cache.ddqtar + this->robot->dynamics.C - this->config.Be * this->memory.u_prev),
+                        this->cache.qpsol.segment(32,7);
+    this->cache.delta = this->cache.qpsol(39);
+
+    // Add a small model-free swing toe feedback portion since the friction is so large it does not track well
+    if (this->memory.iDomain == 0)
+        this->cache.u(4) += 50. * (this->cache.ya(8) - this->cache.yd(8)) + 2. * (this->cache.dya(8) - this->cache.dyd(8));
+    else
+        this->cache.u(9) += 50. * (this->cache.ya(8) - this->cache.yd(8)) + 2. * (this->cache.dya(8) - this->cache.dyd(8));
+
     // Return   
     return this->cache.u;
 }
@@ -753,20 +967,13 @@ void Walking1DControl::updateRaibert(double xVd, double yVd) {
     vprevy = this->lpVaYlastStep.getValue();
 
     // Make swing leg respond to pitch/roll error
-    double offset = 0;
-    if (this->memory.iDomain == 0)
-        offset = -0.02;
-    else
-        offset = 0.02;
-
-    // // Leg pitch
+    // Leg pitch
     double lp_float = 0.;
     double lr_float = 0.;
     double dlp_float = 0.;
     double dlr_float = 0.;
     if (this->config.swing_angle_absolute) {
         // Make swing leg respond to pitch/roll error
-
         // Leg pitch
         lp_float  = (this->cache.ya(1) - this->cache.yd(1));
         dlp_float = (this->cache.dya(1) - this->cache.dyd(1));
@@ -778,7 +985,7 @@ void Walking1DControl::updateRaibert(double xVd, double yVd) {
         this->cache.yd(5)  += (this->cache.ya(1) - this->cache.yd(1));
         this->cache.dyd(5) += (this->cache.dya(1) - this->cache.dyd(1));
         // Hip roll
-        this->cache.yd(6)  -= (this->cache.ya(0) - this->cache.yd(0)) + offset;
+        this->cache.yd(6)  -= (this->cache.ya(0) - this->cache.yd(0));
         this->cache.dyd(6) -= (this->cache.dya(0) - this->cache.dyd(0));
     }
 
@@ -844,8 +1051,8 @@ void Walking1DControl::updateRaibert(double xVd, double yVd) {
     MatrixXd aNewOutputs(3,5);
     aNewOutputs <<
             0.,lo,lo,lo,lo,
-            0.,lp_float+(lp - lp_),lp_float+(lp - lp_),lp_float+(lp - lp_),lp_float+(lp - lp_),
-            0.,lr_float+(lr - lr_),lr_float+(lr - lr_),lr_float+(lr - lr_),lr_float+(lr - lr_);
+            0.,(lp - lp_),(lp - lp_),(lp - lp_),(lp - lp_),
+            0.,(lr - lr_),(lr - lr_),(lr - lr_),(lr - lr_);
 
     bezier_tools::bezier(aNewOutputs, this->phase.tau, newOutputs);
     bezier_tools::dbezier(aNewOutputs, this->phase.tau, d_newOutputs);
@@ -854,12 +1061,12 @@ void Walking1DControl::updateRaibert(double xVd, double yVd) {
     d2_newOutputs = d2_newOutputs * pow(this->phase.dtau, 2);
 
     // Assign to outputs
-     this->cache.yd(4)  += newOutputs(0);
-     this->cache.dyd(4) += d_newOutputs(0);
-     this->cache.yd(5)  += newOutputs(1);
-     this->cache.dyd(5) += d_newOutputs(1);
-     this->cache.yd(6)  += newOutputs(2);
-     this->cache.dyd(6) += d_newOutputs(2);
+    this->cache.yd(4)  += newOutputs(0);
+    this->cache.dyd(4) += d_newOutputs(0);
+    this->cache.yd(5)  += newOutputs(1);
+    this->cache.dyd(5) += d_newOutputs(1);
+    this->cache.yd(6)  += newOutputs(2);
+    this->cache.dyd(6) += d_newOutputs(2);
 
    // Update the accelerations
    this->cache.ddqd(BaseRotX) -= - d2_newOutputs(2);
@@ -1045,7 +1252,7 @@ void Walking1DControl::computeDesired(VectorXd &yd, VectorXd &dyd, VectorXd &d2y
     // Compute
     bezier_tools::bezier(this->memory.paramCurrent, s, yd);
     bezier_tools::dbezier(this->memory.paramCurrent, s, dyd);
-    bezier_tools::dbezier(this->memory.paramCurrent, s, d2yd);
+    bezier_tools::d2bezier(this->memory.paramCurrent, s, d2yd);
     dyd = dyd * this->phase.dtau;
     d2yd = d2yd * pow(this->phase.dtau,2);
 

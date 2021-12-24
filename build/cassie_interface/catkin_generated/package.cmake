@@ -1,6 +1,6 @@
 set(_CATKIN_CURRENT_PACKAGE "cassie_interface")
 set(cassie_interface_VERSION "0.0.0")
-set(cassie_interface_MAINTAINER "Jenna Reher <jreher@caltech.edu>")
+set(cassie_interface_MAINTAINER "Jane Doe <jane.doe@example.com>")
 set(cassie_interface_PACKAGE_FORMAT "1")
 set(cassie_interface_BUILD_DEPENDS "roscpp" "rospy" "gazebo_ros" "cassie_estimation")
 set(cassie_interface_BUILD_EXPORT_DEPENDS "roscpp" "gazebo_ros" "cassie_estimation")

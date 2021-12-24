@@ -37,6 +37,7 @@
 #include <cassie_common_toolbox/callback_helpers.hpp>
 #include <cassie_common_toolbox/cassie_control_msg.h>
 #include <cassie_common_toolbox/cassie_proprioception_msg.h>
+#include <cassie_common_toolbox/cassie_velocity_estimation_msg.h>
 
 #include <realtime_utilities/timing.hpp>
 
@@ -56,13 +57,21 @@ static int mode_command = -1; // Coming from the radio
 // Callback for proprioception subscriber
 void proprioception_callback(const cassie_common_toolbox::cassie_proprioception_msg::ConstPtr& propmsg)
 {
-    robot.q.setZero();
-    robot.dq.setZero();
+//    robot.q.setZero();
+//    robot.dq.setZero();
     unpack_proprioception(propmsg, robot.q, robot.dq, radio, robot.gyroscope, robot.accelerometer, robot.torque, robot.leftContact, robot.rightContact);
     get_proprioception_orientation(*propmsg, robot.q, robot.dq, robot.quat_pelvis);
     mode_command = (int)radio(RadioButtonMap::SB);
     is_initialized = true;
 }
+
+void velocity_estimation_callback(const cassie_common_toolbox::cassie_velocity_estimation_msg::ConstPtr& velmsg)
+{
+    robot.dq(BasePosX) = velmsg->linear_velocity.x;
+    robot.dq(BasePosY) = velmsg->linear_velocity.y;
+    robot.dq(BasePosZ) = velmsg->linear_velocity.z;
+}
+
 
 // Main node
 int main(int argc, char *argv[])
@@ -76,10 +85,13 @@ int main(int argc, char *argv[])
     ros::param::get("/cassie/locomotion_control/dt", dt_des);
     ros::Rate looprate(1/dt_des); // Run at 2 kHz
     ros::Publisher  controller_pub = nh.advertise<cassie_common_toolbox::cassie_control_msg>("/cassie_control", 1);
+    ros::Subscriber vel_est_sub = nh.subscribe("/cassie_velocity_estimation", 1, velocity_estimation_callback, ros::TransportHints().tcpNoDelay(true));
     ros::Subscriber proprioception_sub = nh.subscribe("/cassie_proprioception", 1, proprioception_callback, ros::TransportHints().tcpNoDelay(true));
     cassie_common_toolbox::cassie_control_msg control_message;
 
     // Create the associated controllers
+    bool is_one_domain = true;
+    ros::param::get("/cassie/locomotion_control/use_one_domain", is_one_domain);
     StandingControlQP stand_control(nh, robot);
     Walking1DControl walk_control(nh, robot);
 

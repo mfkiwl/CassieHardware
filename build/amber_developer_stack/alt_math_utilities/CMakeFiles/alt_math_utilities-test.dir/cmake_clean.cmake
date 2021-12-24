@@ -1,7 +1,8 @@
 file(REMOVE_RECURSE
-  "CMakeFiles/alt_math_utilities-test.dir/test/test_powfast.cpp.o"
-  "/home/xiaobin/cassie_ws/devel/lib/alt_math_utilities/alt_math_utilities-test.pdb"
   "/home/xiaobin/cassie_ws/devel/lib/alt_math_utilities/alt_math_utilities-test"
+  "/home/xiaobin/cassie_ws/devel/lib/alt_math_utilities/alt_math_utilities-test.pdb"
+  "CMakeFiles/alt_math_utilities-test.dir/test/test_powfast.cpp.o"
+  "CMakeFiles/alt_math_utilities-test.dir/test/test_powfast.cpp.o.d"
 )
 
 # Per-language clean rules from dependency scanning.

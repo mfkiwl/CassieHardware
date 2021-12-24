@@ -64,5 +64,12 @@
         "random": "cpp",
         "set": "cpp",
         "string": "cpp"
-    }
+    },
+    "ros.distro": "melodic",
+    "python.autoComplete.extraPaths": [
+        "/home/xiaobin/robot_local_ws/devel/lib/python2.7/dist-packages",
+        "/home/xiaobin/catkin_ws/devel/lib/python2.7/dist-packages",
+        "/home/xiaobin/cassie_ws/devel/lib/python2.7/dist-packages",
+        "/opt/ros/melodic/lib/python2.7/dist-packages"
+    ]
 }

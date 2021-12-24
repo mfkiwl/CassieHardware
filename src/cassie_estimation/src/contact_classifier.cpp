@@ -1,27 +1,4 @@
-/*
- * MIT License
- * 
- * Copyright (c) 2020 Jenna Reher (jreher@caltech.edu)
- * 
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
-*/
-
+ 
 #include <cassie_estimation/contact_classifier.hpp>
 #include <control_utilities/limits.hpp>
 
@@ -81,6 +58,56 @@ bool ContactClassifier::reconfigure(std_srvs::Empty::Request &req, std_srvs::Emp
 }
 
 void ContactClassifier::update() {
+    MatrixXd Jl(3,7), Jr(3,7), JrigidLeft(3,5), JrigidRight(3,5);
+
+    this->robot->kinematics.computeConstrainedToeJacobian(this->robot->q, Jl, Jr);
+
+    JrigidLeft.setZero();
+    JrigidRight.setZero();
+
+    JrigidLeft.block(0,0,3,4) << Jl.block(0, 0, 3, 4);
+    JrigidLeft.block(0,4,3,1) << Jl.block(0,6,3,1);
+    JrigidRight.block(0,0,3,4) << Jr.block(0, 0, 3, 4);
+    JrigidRight.block(0,4,3,1) << Jr.block(0,6,3,1);
+
+    // Compute the quasi-static grf estimate in robot body frame
+    this->grf.segment(0,3) = - (JrigidLeft.transpose()).completeOrthogonalDecomposition().solve(this->robot->torque.segment(0,5));
+    this->grf.segment(3,3) = - (JrigidRight.transpose()).completeOrthogonalDecomposition().solve(this->robot->torque.segment(5,5));
+
+    // Rotate into the world
+    Eigen::Matrix3d Rx, Ry, R;
+    Rx << 1.,0.,0.,
+    0., cos(this->robot->q(BaseRotX)), -sin(this->robot->q(BaseRotX)),
+    0., sin(this->robot->q(BaseRotX)), cos(this->robot->q(BaseRotX));
+    Ry << cos(this->robot->q(BaseRotY)), 0, sin(this->robot->q(BaseRotY)),
+    0.,1.,0.,
+    -sin(this->robot->q(BaseRotY)), 0, cos(this->robot->q(BaseRotY));
+    R << Ry * Rx;
+
+    grf.segment(0,3) = R * grf.segment(0,3);
+    grf.segment(3,3) = R * grf.segment(3,3);
+
+    // Update vertical grf lowpass
+    this->LowPassLeft.update(this->grf(2));
+    this->LowPassRight.update(this->grf(5));
+
+    if (this->config.use_sigmoid) {
+        // Sigmoid classifier
+        this->robot->leftContact  = sigmoid(this->LowPassLeft.getValue(), this->config.sigmoid_A, this->config.sigmoid_B, this->config.sigmoid_power);
+        this->robot->rightContact = sigmoid(this->LowPassRight.getValue(), this->config.sigmoid_A, this->config.sigmoid_B, this->config.sigmoid_power);
+    } else {
+        // Linear classifier
+        this->robot->leftContact = control_utilities::clamp((this->LowPassLeft.getValue() - this->config.linear_lb) / (this->config.linear_ub - this->config.linear_lb), 0, 1);
+        this->robot->rightContact = control_utilities::clamp((this->LowPassRight.getValue() - this->config.linear_lb) / (this->config.linear_ub - this->config.linear_lb), 0, 1);
+    }
+
+    this->robot->GRF = grf;
+    //    this->robot->leftContact = this->LowPassLeft.getValue();
+    //    this->robot->rightContact = this->LowPassRight.getValue();
+}
+
+/* //////// previous compliant version
+void ContactClassifier::update() {
     MatrixXd Jl(3,7), Jr(3,7), J(6,14), JT(14,6);
     VectorXd tau(14);
 
@@ -135,6 +162,10 @@ void ContactClassifier::update() {
         this->robot->rightContact = control_utilities::clamp((this->LowPassRight.getValue() - this->config.linear_lb) / (this->config.linear_ub - this->config.linear_lb), 0, 1);
     }
 
+    this->robot->GRF = grf;
+//    this->robot->leftContact = this->LowPassLeft.getValue();
+//    this->robot->rightContact = this->LowPassRight.getValue();
 
 
 }
+*/

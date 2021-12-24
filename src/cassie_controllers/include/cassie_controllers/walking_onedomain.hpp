@@ -52,6 +52,7 @@ private:
         VectorXd uff;
         VectorXd ddqtar;
 
+        //SwingLegInverseKinematics ,seems not used
         VectorXd qmd;
         VectorXd dqmd;
 
@@ -86,8 +87,9 @@ private:
 
         Eigen::Matrix<double,Dynamic,Dynamic,RowMajor> G;
         VectorXd g;
-        Eigen::SparseMatrix<double> Gsparse;
 
+        //not used
+        Eigen::SparseMatrix<double> Gsparse;
         Eigen::EulerAnglesZYXd euler;
         Eigen::Transform<double, 3, Affine> T_des_pelvis;
 
@@ -164,6 +166,7 @@ private:
         double ddq_KpY;
         double ddq_KdY;
         double ddq_KiY;
+        double raibert_phaseThreshold;
         VectorXd torque_bounds;
         double left_stance_gravity_scale;
         double right_stance_gravity_scale;
@@ -273,7 +276,7 @@ private:
 
     // Pointer to the controlling nodehandle and related ROS things
     ros::NodeHandle *nh;
-    ros::ServiceServer reconfigureService;
+//    ros::ServiceServer reconfigureService;
 
     control_utilities::LowPassFilter lpVdX    = control_utilities::LowPassFilter(0.001, 0.75);
     control_utilities::LowPassFilter lpVdY    = control_utilities::LowPassFilter(0.001, 0.25);
@@ -300,8 +303,8 @@ private:
     // QP Solver for varying matrices
     SQProblem *qpsolver;
 
-    // Reconfigure callback for sub-node
-    bool reconfigure(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
+//    // Reconfigure callback for sub-node
+//    bool reconfigure(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
 
     // Pointer to robot model
     cassie_model::Cassie *robot;

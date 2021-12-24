@@ -1,6 +1,6 @@
 # generated from genmsg/cmake/pkg-genmsg.cmake.em
 
-message(STATUS "cassie_common_toolbox: 3 messages, 0 services")
+message(STATUS "cassie_common_toolbox: 4 messages, 0 services")
 
 set(MSG_I_FLAGS "-Icassie_common_toolbox:/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg;-Istd_msgs:/opt/ros/melodic/share/std_msgs/cmake/../msg;-Igeometry_msgs:/opt/ros/melodic/share/geometry_msgs/cmake/../msg")
 
@@ -27,6 +27,11 @@ add_custom_target(_cassie_common_toolbox_generate_messages_check_deps_${_filenam
   COMMAND ${CATKIN_ENV} ${PYTHON_EXECUTABLE} ${GENMSG_CHECK_DEPS_SCRIPT} "cassie_common_toolbox" "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_proprioception_msg.msg" "geometry_msgs/Vector3:geometry_msgs/Quaternion:std_msgs/Header"
 )
 
+get_filename_component(_filename "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_velocity_estimation_msg.msg" NAME_WE)
+add_custom_target(_cassie_common_toolbox_generate_messages_check_deps_${_filename}
+  COMMAND ${CATKIN_ENV} ${PYTHON_EXECUTABLE} ${GENMSG_CHECK_DEPS_SCRIPT} "cassie_common_toolbox" "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_velocity_estimation_msg.msg" "geometry_msgs/Vector3:std_msgs/Header"
+)
+
 get_filename_component(_filename "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_control_msg.msg" NAME_WE)
 add_custom_target(_cassie_common_toolbox_generate_messages_check_deps_${_filename}
   COMMAND ${CATKIN_ENV} ${PYTHON_EXECUTABLE} ${GENMSG_CHECK_DEPS_SCRIPT} "cassie_common_toolbox" "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_control_msg.msg" "std_msgs/Header"
@@ -48,6 +53,12 @@ _generate_msg_cpp(cassie_common_toolbox
   "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_proprioception_msg.msg"
   "${MSG_I_FLAGS}"
   "/opt/ros/melodic/share/geometry_msgs/cmake/../msg/Vector3.msg;/opt/ros/melodic/share/geometry_msgs/cmake/../msg/Quaternion.msg;/opt/ros/melodic/share/std_msgs/cmake/../msg/Header.msg"
+  ${CATKIN_DEVEL_PREFIX}/${gencpp_INSTALL_DIR}/cassie_common_toolbox
+)
+_generate_msg_cpp(cassie_common_toolbox
+  "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_velocity_estimation_msg.msg"
+  "${MSG_I_FLAGS}"
+  "/opt/ros/melodic/share/geometry_msgs/cmake/../msg/Vector3.msg;/opt/ros/melodic/share/std_msgs/cmake/../msg/Header.msg"
   ${CATKIN_DEVEL_PREFIX}/${gencpp_INSTALL_DIR}/cassie_common_toolbox
 )
 _generate_msg_cpp(cassie_common_toolbox
@@ -75,6 +86,8 @@ get_filename_component(_filename "/home/xiaobin/cassie_ws/src/cassie_common_tool
 add_dependencies(cassie_common_toolbox_generate_messages_cpp _cassie_common_toolbox_generate_messages_check_deps_${_filename})
 get_filename_component(_filename "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_proprioception_msg.msg" NAME_WE)
 add_dependencies(cassie_common_toolbox_generate_messages_cpp _cassie_common_toolbox_generate_messages_check_deps_${_filename})
+get_filename_component(_filename "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_velocity_estimation_msg.msg" NAME_WE)
+add_dependencies(cassie_common_toolbox_generate_messages_cpp _cassie_common_toolbox_generate_messages_check_deps_${_filename})
 get_filename_component(_filename "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_control_msg.msg" NAME_WE)
 add_dependencies(cassie_common_toolbox_generate_messages_cpp _cassie_common_toolbox_generate_messages_check_deps_${_filename})
 
@@ -97,6 +110,12 @@ _generate_msg_eus(cassie_common_toolbox
   "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_proprioception_msg.msg"
   "${MSG_I_FLAGS}"
   "/opt/ros/melodic/share/geometry_msgs/cmake/../msg/Vector3.msg;/opt/ros/melodic/share/geometry_msgs/cmake/../msg/Quaternion.msg;/opt/ros/melodic/share/std_msgs/cmake/../msg/Header.msg"
+  ${CATKIN_DEVEL_PREFIX}/${geneus_INSTALL_DIR}/cassie_common_toolbox
+)
+_generate_msg_eus(cassie_common_toolbox
+  "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_velocity_estimation_msg.msg"
+  "${MSG_I_FLAGS}"
+  "/opt/ros/melodic/share/geometry_msgs/cmake/../msg/Vector3.msg;/opt/ros/melodic/share/std_msgs/cmake/../msg/Header.msg"
   ${CATKIN_DEVEL_PREFIX}/${geneus_INSTALL_DIR}/cassie_common_toolbox
 )
 _generate_msg_eus(cassie_common_toolbox
@@ -124,6 +143,8 @@ get_filename_component(_filename "/home/xiaobin/cassie_ws/src/cassie_common_tool
 add_dependencies(cassie_common_toolbox_generate_messages_eus _cassie_common_toolbox_generate_messages_check_deps_${_filename})
 get_filename_component(_filename "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_proprioception_msg.msg" NAME_WE)
 add_dependencies(cassie_common_toolbox_generate_messages_eus _cassie_common_toolbox_generate_messages_check_deps_${_filename})
+get_filename_component(_filename "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_velocity_estimation_msg.msg" NAME_WE)
+add_dependencies(cassie_common_toolbox_generate_messages_eus _cassie_common_toolbox_generate_messages_check_deps_${_filename})
 get_filename_component(_filename "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_control_msg.msg" NAME_WE)
 add_dependencies(cassie_common_toolbox_generate_messages_eus _cassie_common_toolbox_generate_messages_check_deps_${_filename})
 
@@ -146,6 +167,12 @@ _generate_msg_lisp(cassie_common_toolbox
   "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_proprioception_msg.msg"
   "${MSG_I_FLAGS}"
   "/opt/ros/melodic/share/geometry_msgs/cmake/../msg/Vector3.msg;/opt/ros/melodic/share/geometry_msgs/cmake/../msg/Quaternion.msg;/opt/ros/melodic/share/std_msgs/cmake/../msg/Header.msg"
+  ${CATKIN_DEVEL_PREFIX}/${genlisp_INSTALL_DIR}/cassie_common_toolbox
+)
+_generate_msg_lisp(cassie_common_toolbox
+  "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_velocity_estimation_msg.msg"
+  "${MSG_I_FLAGS}"
+  "/opt/ros/melodic/share/geometry_msgs/cmake/../msg/Vector3.msg;/opt/ros/melodic/share/std_msgs/cmake/../msg/Header.msg"
   ${CATKIN_DEVEL_PREFIX}/${genlisp_INSTALL_DIR}/cassie_common_toolbox
 )
 _generate_msg_lisp(cassie_common_toolbox
@@ -173,6 +200,8 @@ get_filename_component(_filename "/home/xiaobin/cassie_ws/src/cassie_common_tool
 add_dependencies(cassie_common_toolbox_generate_messages_lisp _cassie_common_toolbox_generate_messages_check_deps_${_filename})
 get_filename_component(_filename "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_proprioception_msg.msg" NAME_WE)
 add_dependencies(cassie_common_toolbox_generate_messages_lisp _cassie_common_toolbox_generate_messages_check_deps_${_filename})
+get_filename_component(_filename "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_velocity_estimation_msg.msg" NAME_WE)
+add_dependencies(cassie_common_toolbox_generate_messages_lisp _cassie_common_toolbox_generate_messages_check_deps_${_filename})
 get_filename_component(_filename "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_control_msg.msg" NAME_WE)
 add_dependencies(cassie_common_toolbox_generate_messages_lisp _cassie_common_toolbox_generate_messages_check_deps_${_filename})
 
@@ -195,6 +224,12 @@ _generate_msg_nodejs(cassie_common_toolbox
   "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_proprioception_msg.msg"
   "${MSG_I_FLAGS}"
   "/opt/ros/melodic/share/geometry_msgs/cmake/../msg/Vector3.msg;/opt/ros/melodic/share/geometry_msgs/cmake/../msg/Quaternion.msg;/opt/ros/melodic/share/std_msgs/cmake/../msg/Header.msg"
+  ${CATKIN_DEVEL_PREFIX}/${gennodejs_INSTALL_DIR}/cassie_common_toolbox
+)
+_generate_msg_nodejs(cassie_common_toolbox
+  "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_velocity_estimation_msg.msg"
+  "${MSG_I_FLAGS}"
+  "/opt/ros/melodic/share/geometry_msgs/cmake/../msg/Vector3.msg;/opt/ros/melodic/share/std_msgs/cmake/../msg/Header.msg"
   ${CATKIN_DEVEL_PREFIX}/${gennodejs_INSTALL_DIR}/cassie_common_toolbox
 )
 _generate_msg_nodejs(cassie_common_toolbox
@@ -222,6 +257,8 @@ get_filename_component(_filename "/home/xiaobin/cassie_ws/src/cassie_common_tool
 add_dependencies(cassie_common_toolbox_generate_messages_nodejs _cassie_common_toolbox_generate_messages_check_deps_${_filename})
 get_filename_component(_filename "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_proprioception_msg.msg" NAME_WE)
 add_dependencies(cassie_common_toolbox_generate_messages_nodejs _cassie_common_toolbox_generate_messages_check_deps_${_filename})
+get_filename_component(_filename "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_velocity_estimation_msg.msg" NAME_WE)
+add_dependencies(cassie_common_toolbox_generate_messages_nodejs _cassie_common_toolbox_generate_messages_check_deps_${_filename})
 get_filename_component(_filename "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_control_msg.msg" NAME_WE)
 add_dependencies(cassie_common_toolbox_generate_messages_nodejs _cassie_common_toolbox_generate_messages_check_deps_${_filename})
 
@@ -244,6 +281,12 @@ _generate_msg_py(cassie_common_toolbox
   "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_proprioception_msg.msg"
   "${MSG_I_FLAGS}"
   "/opt/ros/melodic/share/geometry_msgs/cmake/../msg/Vector3.msg;/opt/ros/melodic/share/geometry_msgs/cmake/../msg/Quaternion.msg;/opt/ros/melodic/share/std_msgs/cmake/../msg/Header.msg"
+  ${CATKIN_DEVEL_PREFIX}/${genpy_INSTALL_DIR}/cassie_common_toolbox
+)
+_generate_msg_py(cassie_common_toolbox
+  "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_velocity_estimation_msg.msg"
+  "${MSG_I_FLAGS}"
+  "/opt/ros/melodic/share/geometry_msgs/cmake/../msg/Vector3.msg;/opt/ros/melodic/share/std_msgs/cmake/../msg/Header.msg"
   ${CATKIN_DEVEL_PREFIX}/${genpy_INSTALL_DIR}/cassie_common_toolbox
 )
 _generate_msg_py(cassie_common_toolbox
@@ -270,6 +313,8 @@ add_dependencies(cassie_common_toolbox_generate_messages cassie_common_toolbox_g
 get_filename_component(_filename "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_estimation_msg.msg" NAME_WE)
 add_dependencies(cassie_common_toolbox_generate_messages_py _cassie_common_toolbox_generate_messages_check_deps_${_filename})
 get_filename_component(_filename "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_proprioception_msg.msg" NAME_WE)
+add_dependencies(cassie_common_toolbox_generate_messages_py _cassie_common_toolbox_generate_messages_check_deps_${_filename})
+get_filename_component(_filename "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_velocity_estimation_msg.msg" NAME_WE)
 add_dependencies(cassie_common_toolbox_generate_messages_py _cassie_common_toolbox_generate_messages_check_deps_${_filename})
 get_filename_component(_filename "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_control_msg.msg" NAME_WE)
 add_dependencies(cassie_common_toolbox_generate_messages_py _cassie_common_toolbox_generate_messages_check_deps_${_filename})

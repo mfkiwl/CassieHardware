@@ -1,6 +1,6 @@
 # generated from genmsg/cmake/pkg-genmsg.context.in
 
-messages_str = "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_control_msg.msg;/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_estimation_msg.msg;/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_proprioception_msg.msg"
+messages_str = "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_control_msg.msg;/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_estimation_msg.msg;/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_proprioception_msg.msg;/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_velocity_estimation_msg.msg"
 services_str = ""
 pkg_name = "cassie_common_toolbox"
 dependencies_str = "std_msgs;geometry_msgs"

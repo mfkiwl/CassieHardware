@@ -1,5 +1,25 @@
 /*
-  cassie robot model class, used for control
+ * MIT License
+ * 
+ * Copyright (c) 2020 Jenna Reher (jreher@caltech.edu)
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
 */
 
 #include <cassie_description/cassie_model.hpp>
@@ -63,15 +83,15 @@ void Kinematics::update(Model *model, const VectorXd &q, const VectorXd &dq) {
     //RigidBodyDynamics::UpdateKinematicsCustom(*model, &q, &dq, nullptr);
     this->cache.J_achilles.setZero();
     SymFunction::J_achilles_constraint(this->cache.J_achilles, q);
-    this->cache.J_poseLeft.setZero();
+    this->cache.J_poseLeftConstraint.setZero();
     SymFunction::J_leftSole_constraint(this->cache.J_poseLeftConstraint, q);
-    this->cache.J_poseRight.setZero();
+    this->cache.J_poseRightConstraint.setZero();
     SymFunction::J_rightSole_constraint(this->cache.J_poseRightConstraint, q);
     this->cache.Jdot_achilles.setZero();
     SymFunction::Jdot_achilles_constraint(this->cache.Jdot_achilles, q, dq);
-    this->cache.Jdot_poseLeft.setZero();
+    this->cache.Jdot_poseLeftConstraint.setZero();
     SymFunction::Jdot_leftSole_constraint(this->cache.Jdot_poseLeftConstraint, q, dq);
-    this->cache.Jdot_poseRight.setZero();
+    this->cache.Jdot_poseRightConstraint.setZero();
     SymFunction::Jdot_rightSole_constraint(this->cache.Jdot_poseRightConstraint, q, dq);
 
     MatrixXd temp_left(2,22), temp_right(2,22);
@@ -87,6 +107,7 @@ void Kinematics::update(Model *model, const VectorXd &q, const VectorXd &dq) {
 } // Kinematics::update
 
 void Kinematics::computeConstrainedToeJacobian(Eigen::VectorXd &q, Eigen::MatrixXd &Jl, Eigen::MatrixXd &Jr) {
+    //// calculate for force mapping
     assert_size_vector(q, 22);
     assert_size_matrix(Jl, 3,7);
     assert_size_matrix(Jr, 3,7);

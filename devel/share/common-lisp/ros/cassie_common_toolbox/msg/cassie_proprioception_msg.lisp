@@ -66,7 +66,12 @@
     :reader contact
     :initarg :contact
     :type (cl:vector cl:float)
-   :initform (cl:make-array 2 :element-type 'cl:float :initial-element 0.0)))
+   :initform (cl:make-array 2 :element-type 'cl:float :initial-element 0.0))
+   (isCalibrated
+    :reader isCalibrated
+    :initarg :isCalibrated
+    :type cl:boolean
+    :initform cl:nil))
 )
 
 (cl:defclass cassie_proprioception_msg (<cassie_proprioception_msg>)
@@ -136,6 +141,11 @@
 (cl:defmethod contact-val ((m <cassie_proprioception_msg>))
   (roslisp-msg-protocol:msg-deprecation-warning "Using old-style slot reader cassie_common_toolbox-msg:contact-val is deprecated.  Use cassie_common_toolbox-msg:contact instead.")
   (contact m))
+
+(cl:ensure-generic-function 'isCalibrated-val :lambda-list '(m))
+(cl:defmethod isCalibrated-val ((m <cassie_proprioception_msg>))
+  (roslisp-msg-protocol:msg-deprecation-warning "Using old-style slot reader cassie_common_toolbox-msg:isCalibrated-val is deprecated.  Use cassie_common_toolbox-msg:isCalibrated instead.")
+  (isCalibrated m))
 (cl:defmethod roslisp-msg-protocol:serialize ((msg <cassie_proprioception_msg>) ostream)
   "Serializes a message object of type '<cassie_proprioception_msg>"
   (roslisp-msg-protocol:serialize (cl:slot-value msg 'header) ostream)
@@ -213,6 +223,7 @@
     (cl:write-byte (cl:ldb (cl:byte 8 48) bits) ostream)
     (cl:write-byte (cl:ldb (cl:byte 8 56) bits) ostream)))
    (cl:slot-value msg 'contact))
+  (cl:write-byte (cl:ldb (cl:byte 8 0) (cl:if (cl:slot-value msg 'isCalibrated) 1 0)) ostream)
 )
 (cl:defmethod roslisp-msg-protocol:deserialize ((msg <cassie_proprioception_msg>) istream)
   "Deserializes a message object of type '<cassie_proprioception_msg>"
@@ -312,6 +323,7 @@
       (cl:setf (cl:ldb (cl:byte 8 48) bits) (cl:read-byte istream))
       (cl:setf (cl:ldb (cl:byte 8 56) bits) (cl:read-byte istream))
     (cl:setf (cl:aref vals i) (roslisp-utils:decode-double-float-bits bits)))))
+    (cl:setf (cl:slot-value msg 'isCalibrated) (cl:not (cl:zerop (cl:read-byte istream))))
   msg
 )
 (cl:defmethod roslisp-msg-protocol:ros-datatype ((msg (cl:eql '<cassie_proprioception_msg>)))
@@ -322,16 +334,16 @@
   "cassie_common_toolbox/cassie_proprioception_msg")
 (cl:defmethod roslisp-msg-protocol:md5sum ((type (cl:eql '<cassie_proprioception_msg>)))
   "Returns md5sum for a message object of type '<cassie_proprioception_msg>"
-  "6f2b82c0e07a0ccde1e150112cb04100")
+  "3be1623c7974da649675ad63828eb904")
 (cl:defmethod roslisp-msg-protocol:md5sum ((type (cl:eql 'cassie_proprioception_msg)))
   "Returns md5sum for a message object of type 'cassie_proprioception_msg"
-  "6f2b82c0e07a0ccde1e150112cb04100")
+  "3be1623c7974da649675ad63828eb904")
 (cl:defmethod roslisp-msg-protocol:message-definition ((type (cl:eql '<cassie_proprioception_msg>)))
   "Returns full string definition for message of type '<cassie_proprioception_msg>"
-  (cl:format cl:nil "Header                   header~%float64[16]              radio~%float64[10]              motor_torque~%float64[14]              encoder_position~%float64[14]              encoder_velocity~%geometry_msgs/Quaternion orientation~%geometry_msgs/Vector3    angular_velocity~%geometry_msgs/Vector3    linear_velocity~%geometry_msgs/Vector3    linear_acceleration~%float64[2]               q_achilles~%float64[2]               dq_achilles~%float64[2]               contact~%~%================================================================================~%MSG: std_msgs/Header~%# Standard metadata for higher-level stamped data types.~%# This is generally used to communicate timestamped data ~%# in a particular coordinate frame.~%# ~%# sequence ID: consecutively increasing ID ~%uint32 seq~%#Two-integer timestamp that is expressed as:~%# * stamp.sec: seconds (stamp_secs) since epoch (in Python the variable is called 'secs')~%# * stamp.nsec: nanoseconds since stamp_secs (in Python the variable is called 'nsecs')~%# time-handling sugar is provided by the client library~%time stamp~%#Frame this data is associated with~%string frame_id~%~%================================================================================~%MSG: geometry_msgs/Quaternion~%# This represents an orientation in free space in quaternion form.~%~%float64 x~%float64 y~%float64 z~%float64 w~%~%================================================================================~%MSG: geometry_msgs/Vector3~%# This represents a vector in free space. ~%# It is only meant to represent a direction. Therefore, it does not~%# make sense to apply a translation to it (e.g., when applying a ~%# generic rigid transformation to a Vector3, tf2 will only apply the~%# rotation). If you want your data to be translatable too, use the~%# geometry_msgs/Point message instead.~%~%float64 x~%float64 y~%float64 z~%~%"))
+  (cl:format cl:nil "Header                   header~%float64[16]              radio~%float64[10]              motor_torque~%float64[14]              encoder_position~%float64[14]              encoder_velocity~%geometry_msgs/Quaternion orientation~%geometry_msgs/Vector3    angular_velocity~%geometry_msgs/Vector3    linear_velocity~%geometry_msgs/Vector3    linear_acceleration~%float64[2]               q_achilles~%float64[2]               dq_achilles~%float64[2]               contact~%bool                     isCalibrated~%~%~%================================================================================~%MSG: std_msgs/Header~%# Standard metadata for higher-level stamped data types.~%# This is generally used to communicate timestamped data ~%# in a particular coordinate frame.~%# ~%# sequence ID: consecutively increasing ID ~%uint32 seq~%#Two-integer timestamp that is expressed as:~%# * stamp.sec: seconds (stamp_secs) since epoch (in Python the variable is called 'secs')~%# * stamp.nsec: nanoseconds since stamp_secs (in Python the variable is called 'nsecs')~%# time-handling sugar is provided by the client library~%time stamp~%#Frame this data is associated with~%string frame_id~%~%================================================================================~%MSG: geometry_msgs/Quaternion~%# This represents an orientation in free space in quaternion form.~%~%float64 x~%float64 y~%float64 z~%float64 w~%~%================================================================================~%MSG: geometry_msgs/Vector3~%# This represents a vector in free space. ~%# It is only meant to represent a direction. Therefore, it does not~%# make sense to apply a translation to it (e.g., when applying a ~%# generic rigid transformation to a Vector3, tf2 will only apply the~%# rotation). If you want your data to be translatable too, use the~%# geometry_msgs/Point message instead.~%~%float64 x~%float64 y~%float64 z~%~%"))
 (cl:defmethod roslisp-msg-protocol:message-definition ((type (cl:eql 'cassie_proprioception_msg)))
   "Returns full string definition for message of type 'cassie_proprioception_msg"
-  (cl:format cl:nil "Header                   header~%float64[16]              radio~%float64[10]              motor_torque~%float64[14]              encoder_position~%float64[14]              encoder_velocity~%geometry_msgs/Quaternion orientation~%geometry_msgs/Vector3    angular_velocity~%geometry_msgs/Vector3    linear_velocity~%geometry_msgs/Vector3    linear_acceleration~%float64[2]               q_achilles~%float64[2]               dq_achilles~%float64[2]               contact~%~%================================================================================~%MSG: std_msgs/Header~%# Standard metadata for higher-level stamped data types.~%# This is generally used to communicate timestamped data ~%# in a particular coordinate frame.~%# ~%# sequence ID: consecutively increasing ID ~%uint32 seq~%#Two-integer timestamp that is expressed as:~%# * stamp.sec: seconds (stamp_secs) since epoch (in Python the variable is called 'secs')~%# * stamp.nsec: nanoseconds since stamp_secs (in Python the variable is called 'nsecs')~%# time-handling sugar is provided by the client library~%time stamp~%#Frame this data is associated with~%string frame_id~%~%================================================================================~%MSG: geometry_msgs/Quaternion~%# This represents an orientation in free space in quaternion form.~%~%float64 x~%float64 y~%float64 z~%float64 w~%~%================================================================================~%MSG: geometry_msgs/Vector3~%# This represents a vector in free space. ~%# It is only meant to represent a direction. Therefore, it does not~%# make sense to apply a translation to it (e.g., when applying a ~%# generic rigid transformation to a Vector3, tf2 will only apply the~%# rotation). If you want your data to be translatable too, use the~%# geometry_msgs/Point message instead.~%~%float64 x~%float64 y~%float64 z~%~%"))
+  (cl:format cl:nil "Header                   header~%float64[16]              radio~%float64[10]              motor_torque~%float64[14]              encoder_position~%float64[14]              encoder_velocity~%geometry_msgs/Quaternion orientation~%geometry_msgs/Vector3    angular_velocity~%geometry_msgs/Vector3    linear_velocity~%geometry_msgs/Vector3    linear_acceleration~%float64[2]               q_achilles~%float64[2]               dq_achilles~%float64[2]               contact~%bool                     isCalibrated~%~%~%================================================================================~%MSG: std_msgs/Header~%# Standard metadata for higher-level stamped data types.~%# This is generally used to communicate timestamped data ~%# in a particular coordinate frame.~%# ~%# sequence ID: consecutively increasing ID ~%uint32 seq~%#Two-integer timestamp that is expressed as:~%# * stamp.sec: seconds (stamp_secs) since epoch (in Python the variable is called 'secs')~%# * stamp.nsec: nanoseconds since stamp_secs (in Python the variable is called 'nsecs')~%# time-handling sugar is provided by the client library~%time stamp~%#Frame this data is associated with~%string frame_id~%~%================================================================================~%MSG: geometry_msgs/Quaternion~%# This represents an orientation in free space in quaternion form.~%~%float64 x~%float64 y~%float64 z~%float64 w~%~%================================================================================~%MSG: geometry_msgs/Vector3~%# This represents a vector in free space. ~%# It is only meant to represent a direction. Therefore, it does not~%# make sense to apply a translation to it (e.g., when applying a ~%# generic rigid transformation to a Vector3, tf2 will only apply the~%# rotation). If you want your data to be translatable too, use the~%# geometry_msgs/Point message instead.~%~%float64 x~%float64 y~%float64 z~%~%"))
 (cl:defmethod roslisp-msg-protocol:serialization-length ((msg <cassie_proprioception_msg>))
   (cl:+ 0
      (roslisp-msg-protocol:serialization-length (cl:slot-value msg 'header))
@@ -346,6 +358,7 @@
      0 (cl:reduce #'cl:+ (cl:slot-value msg 'q_achilles) :key #'(cl:lambda (ele) (cl:declare (cl:ignorable ele)) (cl:+ 8)))
      0 (cl:reduce #'cl:+ (cl:slot-value msg 'dq_achilles) :key #'(cl:lambda (ele) (cl:declare (cl:ignorable ele)) (cl:+ 8)))
      0 (cl:reduce #'cl:+ (cl:slot-value msg 'contact) :key #'(cl:lambda (ele) (cl:declare (cl:ignorable ele)) (cl:+ 8)))
+     1
 ))
 (cl:defmethod roslisp-msg-protocol:ros-message-to-list ((msg <cassie_proprioception_msg>))
   "Converts a ROS message object to a list"
@@ -362,4 +375,5 @@
     (cl:cons ':q_achilles (q_achilles msg))
     (cl:cons ':dq_achilles (dq_achilles msg))
     (cl:cons ':contact (contact msg))
+    (cl:cons ':isCalibrated (isCalibrated msg))
 ))

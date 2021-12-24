@@ -18,7 +18,7 @@
 
 (defclass cassie_common_toolbox::cassie_proprioception_msg
   :super ros::object
-  :slots (_header _radio _motor_torque _encoder_position _encoder_velocity _orientation _angular_velocity _linear_velocity _linear_acceleration _q_achilles _dq_achilles _contact ))
+  :slots (_header _radio _motor_torque _encoder_position _encoder_velocity _orientation _angular_velocity _linear_velocity _linear_acceleration _q_achilles _dq_achilles _contact _isCalibrated ))
 
 (defmethod cassie_common_toolbox::cassie_proprioception_msg
   (:init
@@ -35,6 +35,7 @@
     ((:q_achilles __q_achilles) (make-array 2 :initial-element 0.0 :element-type :float))
     ((:dq_achilles __dq_achilles) (make-array 2 :initial-element 0.0 :element-type :float))
     ((:contact __contact) (make-array 2 :initial-element 0.0 :element-type :float))
+    ((:isCalibrated __isCalibrated) nil)
     )
    (send-super :init)
    (setq _header __header)
@@ -49,6 +50,7 @@
    (setq _q_achilles __q_achilles)
    (setq _dq_achilles __dq_achilles)
    (setq _contact __contact)
+   (setq _isCalibrated __isCalibrated)
    self)
   (:header
    (&rest __header)
@@ -106,6 +108,9 @@
   (:contact
    (&optional __contact)
    (if __contact (setq _contact __contact)) _contact)
+  (:isCalibrated
+   (&optional __isCalibrated)
+   (if __isCalibrated (setq _isCalibrated __isCalibrated)) _isCalibrated)
   (:serialization-length
    ()
    (+
@@ -133,6 +138,8 @@
     (* 8    2)
     ;; float64[2] _contact
     (* 8    2)
+    ;; bool _isCalibrated
+    1
     ))
   (:serialize
    (&optional strm)
@@ -176,6 +183,8 @@
      (dotimes (i 2)
        (sys::poke (elt _contact i) (send s :buffer) (send s :count) :double) (incf (stream-count s) 8)
        )
+     ;; bool _isCalibrated
+       (if _isCalibrated (write-byte -1 s) (write-byte 0 s))
      ;;
      (if (null strm) (get-output-stream-string s))))
   (:deserialize
@@ -218,11 +227,13 @@
    (dotimes (i (length _contact))
      (setf (elt _contact i) (sys::peek buf ptr- :double)) (incf ptr- 8)
      )
+   ;; bool _isCalibrated
+     (setq _isCalibrated (not (= 0 (sys::peek buf ptr- :char)))) (incf ptr- 1)
    ;;
    self)
   )
 
-(setf (get cassie_common_toolbox::cassie_proprioception_msg :md5sum-) "6f2b82c0e07a0ccde1e150112cb04100")
+(setf (get cassie_common_toolbox::cassie_proprioception_msg :md5sum-) "3be1623c7974da649675ad63828eb904")
 (setf (get cassie_common_toolbox::cassie_proprioception_msg :datatype-) "cassie_common_toolbox/cassie_proprioception_msg")
 (setf (get cassie_common_toolbox::cassie_proprioception_msg :definition-)
       "Header                   header
@@ -237,6 +248,8 @@ geometry_msgs/Vector3    linear_acceleration
 float64[2]               q_achilles
 float64[2]               dq_achilles
 float64[2]               contact
+bool                     isCalibrated
+
 
 ================================================================================
 MSG: std_msgs/Header
@@ -279,6 +292,6 @@ float64 z
 
 
 
-(provide :cassie_common_toolbox/cassie_proprioception_msg "6f2b82c0e07a0ccde1e150112cb04100")
+(provide :cassie_common_toolbox/cassie_proprioception_msg "3be1623c7974da649675ad63828eb904")
 
 

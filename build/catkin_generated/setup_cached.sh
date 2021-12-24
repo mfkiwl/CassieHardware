@@ -7,10 +7,5 @@
 # new environment variables
 
 # modified environment variables
-export CMAKE_PREFIX_PATH="/home/xiaobin/cassie_ws/devel:$CMAKE_PREFIX_PATH"
-export LD_LIBRARY_PATH="/home/xiaobin/cassie_ws/devel/lib:$LD_LIBRARY_PATH"
-export PKG_CONFIG_PATH="/home/xiaobin/cassie_ws/devel/lib/pkgconfig:$PKG_CONFIG_PATH"
+export PATH='/opt/ros/melodic/bin:/home/xiaobin/anaconda3/condabin:/home/xiaobin/.local/share/umake/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/xiaobin/repos/pycharm/pycharm-community-2021.3/bin:/home/xiaobin/cassie_ws/src/amber_developer_stack/common_scripts/scripts:/home/xiaobin/cassie_ws/src/amber_developer_stack/common_scripts/scripts'
 export PWD='/home/xiaobin/cassie_ws/build'
-export PYTHONPATH="/home/xiaobin/cassie_ws/devel/lib/python2.7/dist-packages:$PYTHONPATH"
-export ROSLISP_PACKAGE_DIRECTORIES='/home/xiaobin/cassie_ws/devel/share/common-lisp'
-export ROS_PACKAGE_PATH="/home/xiaobin/cassie_ws/src:$ROS_PACKAGE_PATH"

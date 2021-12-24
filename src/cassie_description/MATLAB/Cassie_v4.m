@@ -2,10 +2,10 @@ classdef Cassie_v4 < RobotLinks
     %% Class: Cassie
     %
     % Description: This is a descriptive class for the Cassie full model.
-    %   - This is the 3D Cassie model including compliance. 
+    %   - This is the 3D Cassie model including compliance.
     %
     % Author: Jenna Reher, (v1,v3,v4, jreher@caltech.edu)
-    %         Wenlong Ma, (v2, wma@caltech.edu) 
+    %         Wenlong Ma, (v2, wma@caltech.edu)
     % _____________________________________________________________________
     properties
         isplanar
@@ -14,7 +14,7 @@ classdef Cassie_v4 < RobotLinks
         % Locations of all contact points
         %   - Includes rod end attachment
         ContactPoints
-   
+        
         % Specs for Agility described foot orientationsfr
         Rfoot = [...
             cos(50 * pi / 180), -sin(50 * pi / 180), 0; % This rotation makes y-forward, x-down
@@ -54,7 +54,7 @@ classdef Cassie_v4 < RobotLinks
             for i=1:6
                 base(i).Limit = limits(i);
             end
-                
+            
             obj = obj@RobotLinks(urdf,base);
             obj.isplanar = isplanar;
             obj.isrigid = isrigid;
@@ -112,10 +112,10 @@ classdef Cassie_v4 < RobotLinks
                 
             end
             
-            %% Define contact frames 
+            %% Define contact frames
             Rfoot = obj.Rfoot; % Rotation for -X down
-            toWorld = [0,0,-1; 1,0,0; 0,-1,0]; 
-            Rcontact = Rfoot * toWorld; 
+            toWorld = [0,0,-1; 1,0,0; 0,-1,0];
+            Rcontact = Rfoot * toWorld;
             
             l_foot_frame = obj.Joints(getJointIndices(obj, 'LeftFootPitch'));
             
@@ -145,7 +145,7 @@ classdef Cassie_v4 < RobotLinks
                 'Name','LeftThighConnector',...
                 'Reference', l_thigh_frame,...
                 'Offset', [0,0,0.045],...
-                'R', [0,0,0]);  
+                'R', [0,0,0]);
             
             obj.ContactPoints.LeftAchillesSpringEnd = CoordinateFrame(...
                 'Name','LeftAchillesSpringEnd',...
@@ -246,8 +246,8 @@ classdef Cassie_v4 < RobotLinks
                 hol_trans_springs = [l_ach, r_ach];
                 % Simplification step
                 hol_trans_springs = hol_trans_springs.subs(x([1:6, ...
-                   7,  8,  9,  14, ...
-                   15, 16, 17, 22]), zeros(14,1));
+                    7,  8,  9,  14, ...
+                    15, 16, 17, 22]), zeros(14,1));
                 
                 hol_trans_springs_label = {'LeftAchillesConnection',...
                     'RightAchillesConnection'};
@@ -266,14 +266,14 @@ classdef Cassie_v4 < RobotLinks
                 export_coriolis = false;
             end
             obj.exportDynamics(export_coriolis);
-            obj.exportKinematics();
+            obj.exportKinematics_ZeroYaw();
             obj.exportInternalConstraints();
             obj.exportExternalConstraints();
             obj.exportWalkOutputs();
             obj.exportStandCOMOutputs();
         end
         
-        function [] = exportKinematics(obj)
+        function [] = exportKinematics_ZeroCartesian(obj)
             % Export path
             module = 'kinematics';
             export_path = [obj.rpath, '/MATLAB/symbolic/+frost_expr/+', module];
@@ -290,11 +290,12 @@ classdef Cassie_v4 < RobotLinks
             % Break out states
             q = obj.States.x;
             dq = obj.States.dx;
-                                                                  
+            
             % Left Foot Pose - In body frame of Pelvis!!
             leftFootPose = [obj.getCartesianPosition(obj.ContactPoints.LeftSole)';
-                            obj.getRelativeEulerAngles(obj.ContactPoints.LeftSole)'];
+                obj.getRelativeEulerAngles(obj.ContactPoints.LeftSole)'];
             leftFootPose = leftFootPose.subs(q(1:6), zeros(6,1));
+            
             JleftFoot = jacobian(leftFootPose, q);
             
             expr{end+1} = SymFunction('pose_leftFoot', leftFootPose, {q});
@@ -309,10 +310,10 @@ classdef Cassie_v4 < RobotLinks
             
             expr{end+1} = SymFunction('p_leftToe', pLeftToe, {q});
             expr{end+1} = SymFunction('J_leftToe', JleftToe, {q});
-
+            
             % Right Foot Pose - In body frame of Pelvis!!
             rightFootPose = [obj.getCartesianPosition(obj.ContactPoints.RightSole)';
-                             obj.getRelativeEulerAngles(obj.ContactPoints.RightSole)'];
+                obj.getRelativeEulerAngles(obj.ContactPoints.RightSole)'];
             rightFootPose = rightFootPose.subs(q(1:6), zeros(6,1));
             JrightFoot = jacobian(rightFootPose, q);
             
@@ -321,18 +322,130 @@ classdef Cassie_v4 < RobotLinks
             
             expr{end+1} = SymFunction('position_rightFoot', rightFootPose(1:3), {q});
             expr{end+1} = SymFunction('J_position_rightFoot', JrightFoot(1:3,:), {q});
-
+            
             pRightToe = obj.getCartesianPosition(obj.Joints(obj.getJointIndices('RightFootPitch')))';
             pRightToe = pRightToe.subs(q(1:6), zeros(6,1));
             JrightToe = jacobian(pRightToe, q);
             
             expr{end+1} = SymFunction('p_rightToe', pRightToe, {q});
             expr{end+1} = SymFunction('J_rightToe', JrightToe, {q});
-
+            
             % Center of Mass - In body frame of pelvis!
+            % -------------------------changed: only subs pelvis yaw =0
             com = obj.getComPosition()';
             com = com.subs(q(1:6), zeros(6,1));
+            Jcom = jacobian(com,q);
             expr{end+1} = SymFunction('p_com', com, {q});
+            expr{end+1} = SymFunction('J_com', Jcom, {q});
+            % Export the files
+            for i = 1:length(expr)
+                export_fun(expr{i}, export_path, matlab_path);
+            end
+            
+            % Move the files into the appropriate folder for runtime code
+            src_list = dir(strcat(export_path, '/*.cc'));
+            hed_list = dir(strcat(export_path, '/*.hh'));
+            
+            for i = 1:length(src_list)
+                tardir= strcat( './gen/src/' );
+                srcdir  = strcat(src_list(i).folder, '/', src_list(i).name );
+                if ~exist(tardir,'dir')
+                    mkdir(char(tardir));
+                end
+                movefile(srcdir,  tardir);
+            end
+            for i = 1:length(hed_list)
+                tardir  = strcat( './gen/include/frost_expr/kinematics/' );
+                srcdir= strcat(hed_list(i).folder, '/', hed_list(i).name );
+                if ~exist(tardir,'dir')
+                    mkdir(char(tardir));
+                end
+                movefile(srcdir,  tardir);
+            end
+        end
+        
+        function [] = exportKinematics_ZeroYaw(obj)
+            % Export path
+            module = 'kinematics';
+            export_path = [obj.rpath, '/MATLAB/symbolic/+frost_expr/+', module];
+            matlab_path = [obj.rpath, '/MATLAB/symbolic/+codegen/+',    module];
+            if ~exist(export_path,'dir')
+                mkdir(char(export_path));
+            end
+            if ~exist(matlab_path,'dir')
+                mkdir(char(matlab_path));
+            end
+            
+            expr = {};
+            
+            % Break out states
+            q = obj.States.x;
+            dq = obj.States.dx;
+            
+            % Left Foot Pose - In body frame of Pelvis!!
+            leftFootPose = [obj.getCartesianPosition(obj.ContactPoints.LeftSole)';
+                obj.getRelativeEulerAngles(obj.ContactPoints.LeftSole)'];
+            %             leftFootPose = leftFootPose.subs(q(1:6), zeros(6,1));
+            
+            %-----------------------only change global xyz and yaw to 0
+            %             leftFootPose = leftFootPose.subs(q(1:3), zeros(3,1));
+            leftFootPose = leftFootPose.subs(q(6), 0);
+            JleftFoot = jacobian(leftFootPose, q);
+            
+            expr{end+1} = SymFunction('pose_leftFoot', leftFootPose, {q});
+            expr{end+1} = SymFunction('J_leftFoot', JleftFoot, {q});
+            
+            expr{end+1} = SymFunction('position_leftFoot', leftFootPose(1:3), {q});
+            expr{end+1} = SymFunction('J_position_leftFoot', JleftFoot(1:3,:), {q});
+            
+            
+            
+            % Right Foot Pose - In body frame of Pelvis!!
+            rightFootPose = [obj.getCartesianPosition(obj.ContactPoints.RightSole)';
+                obj.getRelativeEulerAngles(obj.ContactPoints.RightSole)'];
+            rightFootPose = rightFootPose.subs(q(6), zeros(1));
+            JrightFoot = jacobian(rightFootPose, q);
+            
+            expr{end+1} = SymFunction('pose_rightFoot', rightFootPose, {q});
+            expr{end+1} = SymFunction('J_rightFoot', JrightFoot, {q});
+            
+            expr{end+1} = SymFunction('position_rightFoot', rightFootPose(1:3), {q});
+            expr{end+1} = SymFunction('J_position_rightFoot', JrightFoot(1:3,:), {q});
+            
+            
+            
+            
+            pLeftToe = obj.getCartesianPosition(obj.Joints(obj.getJointIndices('LeftFootPitch')))';
+            %             pLeftToe = pLeftToe.subs(q(6), zeros(1));
+            JleftToe = jacobian(pLeftToe, q);
+            
+            expr{end+1} = SymFunction('p_leftToe', pLeftToe, {q});
+            expr{end+1} = SymFunction('J_leftToe', JleftToe, {q});
+            
+            pRightToe = obj.getCartesianPosition(obj.Joints(obj.getJointIndices('RightFootPitch')))';
+            %             pRightToe = pRightToe.subs(q(6), zeros(1));
+            JrightToe = jacobian(pRightToe, q);
+            
+            expr{end+1} = SymFunction('p_rightToe', pRightToe, {q});
+            expr{end+1} = SymFunction('J_rightToe', JrightToe, {q});
+            
+            % Center of Mass - In body frame of pelvis!
+            % -------------------------changed: only subs pelvis yaw =0
+            com = obj.getComPosition()';
+            %             com = com.subs(q(6), zeros(1));
+            com_leftstance = com-pLeftToe;
+            com_rightstance = com-pRightToe;
+            
+            %             Jcom = jacobian(com,q);
+            expr{end+1} = SymFunction('p_com_LeftStance', com_leftstance, {q});
+            expr{end+1} = SymFunction('J_com_LeftStance', jacobian(com_leftstance,q), {q});
+            expr{end+1} = SymFunction('p_com_RightStance', com_rightstance, {q});
+            expr{end+1} = SymFunction('J_com_RightStance', jacobian(com_rightstance,q), {q});
+            expr{end+1} = SymFunction('dp_com_absolute',jacobian(com,q)*dq,{q,dq});
+            expr{end+1} = SymFunction('p_com_absolute', com, {q});
+            
+            
+            
             
             % Export the files
             for i = 1:length(expr)
@@ -384,7 +497,7 @@ classdef Cassie_v4 < RobotLinks
             links = getTwists(obj.Links);
             for i=1:n_link
                 links{i}.Mass = obj.Links(i).Mass;
-                links{i}.Inertia = obj.Links(i).Inertia;   
+                links{i}.Inertia = obj.Links(i).Inertia;
             end
             
             % Evaluate mass-inertia
@@ -399,16 +512,26 @@ classdef Cassie_v4 < RobotLinks
                     end
                 end
             end
-            De = SymFunction(['De_',obj.Name], De_raw + De_motor, {q});  
+            De = SymFunction(['De_',obj.Name], De_raw + De_motor, {q});
+            De11 = eval_math_fun('Simplify',De(11,11));
             expr{end+1} = De;
             
             if export_coriolis
                 % Evaluate coriolis
                 expr{end+1} = SymFunction(['Ce_',obj.Name],eval_math_fun('InertiaToCoriolis',{De,q,dq}, [],'DelayedSet',false),{q,dq});
             end
-
+            
             % Evaluate gravity
             expr{end+1} = SymFunction(['Ge_',obj.Name],eval_math_fun('GravityVector',[links,{q}]),{q});
+            
+            
+            obj.configureDynamics('DelayCoriolisSet',false);
+            Fvectot = 0;
+            for i = 1:length(obj.Fvec)
+                Fvectot = Fvectot + obj.Fvec{i};
+            end
+            expr{end+1} = SymFunction(['Fvectot_',obj.Name],Fvectot,{q,dq});
+            
             
             % Joint torque mapping matrix
             expr{end+1} = SymFunction(['Be_',obj.Name], obj.Gmap.Control.u, {q});
@@ -560,10 +683,10 @@ classdef Cassie_v4 < RobotLinks
             contactRight = ToContactFrame(obj.ContactPoints.RightSole, 'PointContactWithFriction');
             pointLeft = ToContactFrame(obj.Joints(getJointIndices(obj, 'LeftFootPitch')), 'PointContactWithFriction');
             pointRight = ToContactFrame(obj.Joints(getJointIndices(obj, 'RightFootPitch')), 'PointContactWithFriction');
-
+            
             % Left Point Contact
             leftPointPose = [obj.getCartesianPosition(pointLeft)';
-                            obj.getRelativeEulerAngles(pointLeft, eye(3))'];
+                obj.getRelativeEulerAngles(pointLeft, eye(3))'];
             leftPointConstr = leftPointPose([1,2,3, 6],1);
             J_leftPointConstr = jacobian(leftPointConstr,q);
             dp_leftPointConstr = J_leftPointConstr * dq;
@@ -575,7 +698,7 @@ classdef Cassie_v4 < RobotLinks
             
             % Right Point Contact
             rightPointPose = [obj.getCartesianPosition(pointRight)';
-                            obj.getRelativeEulerAngles(pointRight, eye(3))'];
+                obj.getRelativeEulerAngles(pointRight, eye(3))'];
             rightPointConstr = rightPointPose([1,2,3, 6],1);
             J_rightPointConstr = jacobian(rightPointConstr,q);
             dp_rightPointConstr = J_rightPointConstr * dq;
@@ -588,8 +711,8 @@ classdef Cassie_v4 < RobotLinks
             
             % Left Sole
             leftFootPose = [obj.getCartesianPosition(contactLeft)';
-                            obj.getRelativeEulerAngles(contactLeft, eye(3))'];
-            leftSoleConstr = SymExpression(zeros(5,1));     
+                obj.getRelativeEulerAngles(contactLeft, eye(3))'];
+            leftSoleConstr = SymExpression(zeros(5,1));
             leftSoleConstr(:,1) = leftFootPose([1,2,3,5,6],1);
             % J_leftSoleConstr = jacobian(leftSoleConstr,q);
             %J_leftSoleConstr = wrenchBase' *  getBodyJacobian(obj, obj.ContactPoints.LeftSole);
@@ -597,7 +720,7 @@ classdef Cassie_v4 < RobotLinks
             J_leftSoleConstr = jacobian(leftSoleConstr,q);
             dp_leftSoleConstr = J_leftSoleConstr * dq;
             dJ_leftSoleConstr = jacobian(dp_leftSoleConstr, q);
-                        
+            
             expr{end+1} = SymFunction('p_leftSole_constraint', leftSoleConstr, q);
             expr{end+1} = SymFunction('J_leftSole_constraint', J_leftSoleConstr, q);
             expr{end+1} = SymFunction('Jdot_leftSole_constraint', dJ_leftSoleConstr, {q, dq});
@@ -608,11 +731,11 @@ classdef Cassie_v4 < RobotLinks
             J_ltoe = jacobian(p_ltoe, q);
             dp_ltoe = J_ltoe * dq;
             dJ_ltoe = jacobian(dp_ltoe, q);
-
+            
             expr{end+1} = SymFunction('p_leftToe_constraint', p_ltoe, q);
             expr{end+1} = SymFunction('J_leftToe_constraint', J_ltoe, q);
             expr{end+1} = SymFunction('Jdot_leftToe_constraint', dJ_ltoe, {q, dq});
-
+            
             
             % Left Heel
             p_lheel = SymExpression(zeros(3,1));
@@ -620,7 +743,7 @@ classdef Cassie_v4 < RobotLinks
             J_lheel = jacobian(p_lheel, q);
             dp_lheel = J_lheel * dq;
             dJ_lheel = jacobian(dp_lheel, q);
-
+            
             expr{end+1} = SymFunction('p_leftHeel_constraint', p_lheel, q);
             expr{end+1} = SymFunction('J_leftHeel_constraint', J_lheel, q);
             expr{end+1} = SymFunction('Jdot_leftHeel_constraint', dJ_lheel, {q, dq});
@@ -628,8 +751,8 @@ classdef Cassie_v4 < RobotLinks
             
             % Right Sole
             rightFootPose = [obj.getCartesianPosition(contactRight)';
-                            obj.getRelativeEulerAngles(contactRight, eye(3))'];
-            rightSoleConstr = SymExpression(zeros(5,1));  
+                obj.getRelativeEulerAngles(contactRight, eye(3))'];
+            rightSoleConstr = SymExpression(zeros(5,1));
             rightSoleConstr = rightFootPose([1,2,3,5,6],1);
             % J_rightSoleConstr = wrenchBase' *  getBodyJacobian(obj, obj.ContactPoints.RightSole);
             % J_rightSoleConstr(1:3,:) = jacobian(rightSoleConstr(1:3,:),q);
@@ -640,7 +763,7 @@ classdef Cassie_v4 < RobotLinks
             expr{end+1} = SymFunction('p_rightSole_constraint', rightSoleConstr, q);
             expr{end+1} = SymFunction('J_rightSole_constraint', J_rightSoleConstr, q);
             expr{end+1} = SymFunction('Jdot_rightSole_constraint', dJ_rightSoleConstr, {q, dq});
-
+            
             
             % Right Toe
             p_rtoe = SymExpression(zeros(3,1));
@@ -652,7 +775,7 @@ classdef Cassie_v4 < RobotLinks
             expr{end+1} = SymFunction('p_rightToe_constraint', p_rtoe, q);
             expr{end+1} = SymFunction('J_rightToe_constraint', J_rtoe, q);
             expr{end+1} = SymFunction('Jdot_rightToe_constraint', dJ_rtoe, {q, dq});
-
+            
             
             % Right Heel
             p_rheel = SymExpression(zeros(3,1));
@@ -660,7 +783,7 @@ classdef Cassie_v4 < RobotLinks
             J_rheel = jacobian(p_rheel, q);
             dp_rheel = J_rheel * dq;
             dJ_rheel = jacobian(dp_rheel, q);
-
+            
             expr{end+1} = SymFunction('p_rightHeel_constraint', p_rheel, q);
             expr{end+1} = SymFunction('J_rightHeel_constraint', J_rheel, q);
             expr{end+1} = SymFunction('Jdot_rightHeel_constraint', dJ_rheel, {q, dq});
@@ -692,7 +815,7 @@ classdef Cassie_v4 < RobotLinks
                 movefile(srcdir,  tardir);
             end
         end
-              
+        
         function [] = exportWalkOutputs(obj)
             % Export path
             module = 'outputs';
@@ -726,7 +849,7 @@ classdef Cassie_v4 < RobotLinks
                 'RightHipPitch', ...
                 'RightKneePitch', ...
                 'RightFootPitch'});
-
+            
             % Leg configuration as inverted pendulum
             % Toe Pitch Position
             left_tp_frame = obj.Joints(getJointIndices(obj, 'LeftFootPitch'));
@@ -764,6 +887,8 @@ classdef Cassie_v4 < RobotLinks
             vector = p_rtp - p_CoM;
             vector = vector.subs(q('RightHipYaw'), 0);
             vector = vector.subs(q('RightHipRoll'), 0);
+            
+            
             vector = vector.subs(q('RightShinPitch'), 0);
             vector = vector.subs(q('RightTarsusPitch'), deg2rad(13) - q('RightKneePitch'));
             %vector = eval_math_fun('Simplify', vector);
@@ -779,7 +904,7 @@ classdef Cassie_v4 < RobotLinks
             leftFootOrientation  = obj.getRelativeEulerAngles(obj.ContactPoints.LeftSole)';
             rightFootOrientation = obj.getRelativeEulerAngles(obj.ContactPoints.RightSole)';
             footPitches = [leftFootOrientation(2);
-                           rightFootOrientation(2)];
+                rightFootOrientation(2)];
             footPitches = footPitches.subs(q('BaseRotX'), 0);
             footPitches = footPitches.subs(q('BaseRotZ'), 0);
             
@@ -808,7 +933,7 @@ classdef Cassie_v4 < RobotLinks
             % Zero compliant elements
             yLeftStanceActual = yLeftStanceActual.subs(q(obj.getJointIndices({'LeftShinPitch', 'RightShinPitch'})), zeros(2,1));
             yLeftStanceActual = yLeftStanceActual.subs(q(obj.getJointIndices({'LeftTarsusPitch', 'RightTarsusPitch'})), deg2rad(13) - q(obj.getJointIndices({'LeftKneePitch', 'RightKneePitch'})));
-
+            
             yRightStanceActual = yRightStanceActual.subs(q(obj.getJointIndices({'LeftShinPitch', 'RightShinPitch'})), zeros(2,1));
             yRightStanceActual = yRightStanceActual.subs(q(obj.getJointIndices({'LeftTarsusPitch', 'RightTarsusPitch'})), deg2rad(13) - q(obj.getJointIndices({'LeftKneePitch', 'RightKneePitch'})));
             
@@ -844,7 +969,7 @@ classdef Cassie_v4 < RobotLinks
             J_yRightStanceActual(1,:) = zeros(1,10); J_yRightStanceActual(1,6) = -1;
             J_yRightStanceActual(2,:) = zeros(1,10); J_yRightStanceActual(2,8) =  1;
             J_yRightStanceActual(9,:) = zeros(1,10); J_yRightStanceActual(9,5) = -1;
-           
+            
             % Actual
             Dya_LeftStanceActual  = jacobian(yLeftStanceActual, X);
             % Dya_LeftStanceActual(1,:) = [jacobian(q('BaseRotX')-leftFootOrientation(1),q), zeros(1,22)];
@@ -869,12 +994,12 @@ classdef Cassie_v4 < RobotLinks
             
             % Force feedback kinematic terms
             p_lr = obj.getCartesianPosition(obj.Joints(getJointIndices(obj, 'LeftHipRoll')))';
-            p_rr = obj.getCartesianPosition(obj.Joints(getJointIndices(obj, 'RightHipRoll')))';            
+            p_rr = obj.getCartesianPosition(obj.Joints(getJointIndices(obj, 'RightHipRoll')))';
             p_lf = obj.getCartesianPosition(left_tp_frame)' - p_lr;
             p_rf = obj.getCartesianPosition(right_tp_frame)' - p_rr;
             p_lf = p_lf.subs(q([1:3,6]), zeros(4,1));
             p_rf = p_rf.subs(q([1:3,6]), zeros(4,1));
-
+            
             % legangle_left  = atan2(sqrt(p_lf(1).^2 + p_lf(2).^2), -p_lf(3));
             % legangle_right = atan2(sqrt(p_rf(1).^2 + p_rf(2).^2), -p_rf(3));
             legpitch_left  = atan2(p_lf(1), -p_lf(3));
@@ -978,7 +1103,7 @@ classdef Cassie_v4 < RobotLinks
                 'RightHipPitch', ...
                 'RightKneePitch', ...
                 'RightFootPitch'});
-
+            
             ya_Stand = q(1:6);
             
             % Create Jacobians
@@ -990,7 +1115,7 @@ classdef Cassie_v4 < RobotLinks
             
             % Output Velocity
             dya_Stand = jacobian(ya_Stand,  q) * dq;
-                        
+            
             % Compile
             expr{end+1} = SymFunction('yaStandCOM', ya_Stand, {q});
             expr{end+1} = SymFunction('dyaStandCOM', dya_Stand, {q, dq});
@@ -1024,5 +1149,544 @@ classdef Cassie_v4 < RobotLinks
                 movefile(srcdir,  tardir);
             end
         end
+        
+        
+        function [] = exportStandCOMOutputs_new(obj)
+            % control COM xyz relative to support polygon centroid
+            % control pelvis roll pitch yaw
+            
+            % Export path
+            module = 'outputs';
+            export_path = [obj.rpath, '/MATLAB/symbolic/+frost_expr/+', module];
+            matlab_path = [obj.rpath, '/MATLAB/symbolic/+codegen/+',    module];
+            if ~(exist(export_path,'dir') == 7)
+                mkdir(char(export_path));
+            end
+            if ~(exist(matlab_path,'dir') == 7)
+                mkdir(char(matlab_path));
+            end
+            
+            expr = {};
+            
+            % Break out states
+            q   = obj.States.x;
+            dq  = obj.States.dx;
+            ddq = obj.States.ddx;
+            X   = SymVariable([q;dq]);
+            dX  =  SymVariable([dq;ddq]);
+            
+            % Indexing
+            rotorIndexing = obj.getJointIndices({...
+                'LeftHipRoll', ...
+                'LeftHipYaw', ...
+                'LeftHipPitch', ...
+                'LeftKneePitch', ...
+                'LeftFootPitch', ...
+                'RightHipRoll', ...
+                'RightHipYaw', ...
+                'RightHipPitch', ...
+                'RightKneePitch', ...
+                'RightFootPitch'});
+            
+            left_tp_frame = obj.ContactPoints.LeftSole; %obj.Joints(getJointIndices(obj, 'LeftFootPitch'));
+            right_tp_frame = obj.ContactPoints.RightSole; %obj.Joints(getJointIndices(obj, 'RightFootPitch'));
+            
+            
+            
+            leftFootPos = obj.getCartesianPosition(left_tp_frame)';
+            rightFootPos = obj.getCartesianPosition(right_tp_frame)';
+            centroid = (leftFootPos+rightFootPos)/2;
+            com = obj.getComPosition()'-centroid;
+            
+            
+            ya_Stand = [obj.getComPosition()'-centroid; q(4:6)];
+            %             ya_Stand = ya_Stand.subs(q(obj.getJointIndices({'LeftShinPitch'})), 0);
+            %             ya_Stand = ya_Stand.subs(q(obj.getJointIndices({'LeftTarsusPitch'})), deg2rad(13) - q(obj.getJointIndices({'LeftKneePitch'})));
+            %             ya_Stand = ya_Stand.subs(q(obj.getJointIndices({'RightShinPitch'})), 0);
+            %             ya_Stand = ya_Stand.subs(q(obj.getJointIndices({'RightTarsusPitch'})), deg2rad(13) - q(obj.getJointIndices({'RightKneePitch'})));
+            
+            
+            % Create Jacobians
+            Jya_Stand  = jacobian(ya_Stand,  SymVariable(q(rotorIndexing)));
+            
+            % Actual
+            Dya_Stand = jacobian(ya_Stand,  X);
+            DLfya_Stand  = jacobian(Dya_Stand*dX, X);
+            
+            % Output Velocity
+            dya_Stand = jacobian(ya_Stand,  q) * dq;
+            
+            %try ignore change in centroid for velocity
+            ya_Stand_abs = [obj.getComPosition()'; q(4:6)];
+            
+            % Create Jacobians
+            Jya_Stand  = jacobian(ya_Stand,  SymVariable(q(rotorIndexing)));
+            
+            % Actual
+            Dya_Stand = jacobian(ya_Stand,  X);
+            DLfya_Stand  = jacobian(Dya_Stand*dX, X);
+            
+            % Output Velocity
+            dya_Stand = jacobian(ya_Stand_abs,  q) * dq;
+            
+            % Compile
+            expr{end+1} = SymFunction('yaStandCOM_new', ya_Stand, {q});
+            expr{end+1} = SymFunction('dyaStandCOM_new', dya_Stand, {q, dq});
+            %             expr{end+1} = SymFunction('Jya_standCOM', Jya_Stand, {q});
+            expr{end+1} = SymFunction('Dya_standCOM_new', Dya_Stand, {q});
+            expr{end+1}  = SymFunction('DLfya_standCOM_new', DLfya_Stand, {q,dq});
+            
+            % Export the files
+            for i = 1:length(expr)
+                export_fun(expr{i}, export_path, matlab_path);
+            end
+            
+            % Move the files into the appropriate folder for runtime code
+            src_list = dir(strcat(export_path, '/*.cc'));
+            hed_list = dir(strcat(export_path, '/*.hh'));
+            
+            for i = 1:length(src_list)
+                tardir = strcat('./gen/src/' );
+                srcdir = strcat(src_list(i).folder, '/', src_list(i).name );
+                if ~exist(tardir,'dir')
+                    mkdir(char(tardir));
+                end
+                movefile(srcdir,  tardir);
+            end
+            for i = 1:length(hed_list)
+                tardir = strcat('./gen/include/frost_expr/outputs/' );
+                srcdir = strcat(hed_list(i).folder, '/', hed_list(i).name );
+                if ~exist(tardir,'dir')
+                    mkdir(char(tardir));
+                end
+                movefile(srcdir,  tardir);
+            end
+        end
+        
+        function [] = exportWalkOutputsXiaobinDirectSynthesis(obj)
+            %%% use hip roll (delta z) difference to replace the pelvis roll outputs.
+            %%% use hip roll to pitch (delta x) difference to replace
+            %%% use vertical COM directly
+            % base
+            module = 'Xiaobin_outputs';
+            export_path = [obj.rpath, '/MATLAB/symbolic/+frost_expr/+', module];
+            matlab_path = [obj.rpath, '/MATLAB/symbolic/+codegen/+',    module];
+            if ~(exist(export_path,'dir') == 7)
+                mkdir(char(export_path));
+            end
+            if ~(exist(matlab_path,'dir') == 7)
+                mkdir(char(matlab_path));
+            end
+            expr = {};
+            % Break out states
+            q   = obj.States.x;
+            dq  = obj.States.dx;
+            ddq = obj.States.ddx;
+            X   = SymVariable([q;dq]);
+            dX  =  SymVariable([dq;ddq]);
+            % Indexing
+            rotorIndexing = obj.getJointIndices({...
+                'LeftHipRoll', ...
+                'LeftHipYaw', ...
+                'LeftHipPitch', ...
+                'LeftKneePitch', ...
+                'LeftFootPitch', ...
+                'RightHipRoll', ...
+                'RightHipYaw', ...
+                'RightHipPitch', ...
+                'RightKneePitch', ...
+                'RightFootPitch'});
+            % Leg configuration as inverted pendulum
+            % Toe Pitch Position
+            left_tp_frame = obj.Joints(getJointIndices(obj, 'LeftFootPitch'));
+            right_tp_frame = obj.Joints(getJointIndices(obj, 'RightFootPitch'));
+            %%%%%%%% step size %%%%%%%%%%%%
+            StepSize_leftStance = obj.getCartesianPosition(right_tp_frame)' -  obj.getCartesianPosition(left_tp_frame)';   %%% toe pitch
+            StepLocal_leftStance = StepSize_leftStance.subs(q('BaseRotZ'), 0);
+            %             StepLocal_leftStance = eval_math_fun('Simplify', StepLocal_leftStance);
+            %             StepLocal_leftStance = eval_math_fun('Chop', StepLocal_leftStance);
+            StepSagittal_leftStance = StepLocal_leftStance(1);
+            StepLateral_leftStance = StepLocal_leftStance(2);
+            
+            StepSize_rightStance = obj.getCartesianPosition(left_tp_frame)' - obj.getCartesianPosition(right_tp_frame)';
+            StepLocal_rightStance = StepSize_rightStance.subs(q('BaseRotZ'), 0);
+            %             StepLocal_rightStance = eval_math_fun('Simplify', StepLocal_rightStance);
+            %             StepLocal_rightStance = eval_math_fun('Chop', StepLocal_rightStance);
+            StepSagittal_rightStance = StepLocal_rightStance(1);
+            StepLateral_rightStance = StepLocal_rightStance(2);
+            
+            leftSwingZ =  StepLocal_rightStance(3);
+            rightSwingZ = StepLocal_leftStance(3);
+            
+            % left stance COM relative to stance pivot
+            com = obj.getComPosition();
+            deltaLeftCOM = com - obj.getCartesianPosition(obj.Joints(getJointIndices(obj, 'LeftFootPitch')));
+            %             deltaLeftCOM = deltaLeftCOM.subs(q('LeftShinPitch'), 0);
+            %             deltaLeftCOM = deltaLeftCOM.subs(q('LeftTarsusPitch'), deg2rad(13) - q('LeftKneePitch'));
+            
+            left_COM = deltaLeftCOM(3);
+            %    left_COM = eval_math_fun('Simplify', left_COM);
+            left_COM = eval_math_fun('Chop', left_COM);
+            
+            %  right stance COM relative to stance pivot
+            deltaRightCOM = com - obj.getCartesianPosition(obj.Joints(getJointIndices(obj, 'RightFootPitch')));
+            %             deltaRightCOM = deltaRightCOM.subs(q('RightShinPitch'), 0);
+            %             deltaRightCOM = deltaRightCOM.subs(q('RightTarsusPitch'), deg2rad(13) - q('RightKneePitch'));
+            
+            right_COM =  deltaRightCOM(3);
+            %  right_COM = eval_math_fun('Simplify', right_COM);
+            right_COM = eval_math_fun('Chop', right_COM);
+            
+            % pelvis Orientations replacement y(0) & y(1)
+            leftHipPos =  obj.getCartesianPosition(obj.Joints(obj.getJointIndices('LeftHipRoll')))';
+            rightHipPos = obj.getCartesianPosition(obj.Joints(obj.getJointIndices('RightHipRoll')))';
+            deltaRoll =  (leftHipPos(3) - rightHipPos(3))/0.27;
+            deltaPitch = (-q('BasePosZ') + 0.5*leftHipPos(3) + 0.5*rightHipPos(3))/0.049;
+            
+            deltaRoll = eval_math_fun('Simplify', deltaRoll);
+            deltaRoll = eval_math_fun('Chop', deltaRoll);
+            deltaPitch = eval_math_fun('Simplify', deltaPitch);
+            deltaPitch = eval_math_fun('Chop', deltaPitch);
+            %%% foot pitch replacement y(8)
+            deltaLeftFoot = obj.ContactPoints.LeftHeel.computeCartesianPosition()- ...
+                obj.ContactPoints.LeftToe.computeCartesianPosition();
+            
+            deltaRightFoot = obj.ContactPoints.RightHeel.computeCartesianPosition()- ...
+                obj.ContactPoints.RightToe.computeCartesianPosition();
+            
+            footLeftPitch = deltaLeftFoot(3)/0.14;
+            footRightPitch = deltaRightFoot(3)/0.14;
+            
+            yLeftStanceActual = [...
+                deltaRoll;
+                deltaPitch;
+                q('LeftHipYaw');
+                left_COM;
+                rightSwingZ;
+                StepSagittal_leftStance;
+                StepLateral_leftStance;
+                q('RightHipYaw');
+                footRightPitch];% footPitches(2)];
+            
+            yRightStanceActual = [...
+                deltaRoll;
+                deltaPitch;
+                q('RightHipYaw');
+                right_COM;
+                leftSwingZ;
+                StepSagittal_rightStance;
+                StepLateral_rightStance;
+                q('LeftHipYaw');
+                footLeftPitch]; %footPitches(1)];
+            
+            % Zero compliant elements
+            yLeftStanceActual = yLeftStanceActual.subs(q(obj.getJointIndices({'RightShinPitch'})), 0);
+            yLeftStanceActual = yLeftStanceActual.subs(q(obj.getJointIndices({'RightTarsusPitch'})), deg2rad(13) - q(obj.getJointIndices({'RightKneePitch'})));
+            
+            yRightStanceActual = yRightStanceActual.subs(q(obj.getJointIndices({'LeftShinPitch'})), 0);
+            yRightStanceActual = yRightStanceActual.subs(q(obj.getJointIndices({'LeftTarsusPitch'})), deg2rad(13) - q(obj.getJointIndices({'LeftKneePitch'})));
+            
+            % try rigid on stance leg
+            yLeftStanceActual = yLeftStanceActual.subs(q(obj.getJointIndices({'LeftShinPitch'})), 0);
+            yLeftStanceActual = yLeftStanceActual.subs(q(obj.getJointIndices({'LeftTarsusPitch'})), deg2rad(13) - q(obj.getJointIndices({'LeftKneePitch'})));
+            
+            yRightStanceActual = yRightStanceActual.subs(q(obj.getJointIndices({'RightShinPitch'})), 0);
+            yRightStanceActual = yRightStanceActual.subs(q(obj.getJointIndices({'RightTarsusPitch'})), deg2rad(13) - q(obj.getJointIndices({'RightKneePitch'})));
+            
+            
+            % Create Jacobians
+            J_yLeftStanceActual  = jacobian(yLeftStanceActual,  SymVariable(q(rotorIndexing)));
+            J_yRightStanceActual = jacobian(yRightStanceActual, SymVariable(q(rotorIndexing)));
+            J_yLeftStanceActual_all  = jacobian(yLeftStanceActual,  q);
+            J_yRightStanceActual_all = jacobian(yRightStanceActual, q);
+            
+            % Actual
+            Dya_LeftStanceActual  = jacobian(yLeftStanceActual,  X);
+            Dya_RightStanceActual = jacobian(yRightStanceActual, X);
+            
+            DLfya_LeftStanceActual  = jacobian(Dya_LeftStanceActual*dX, X);
+            DLfya_RightStanceActual = jacobian(Dya_RightStanceActual*dX, X);
+            
+            % Output Velocity
+            dyLeftStanceActual  = jacobian(yLeftStanceActual,  q) * dq;
+            dyRightStanceActual = jacobian(yRightStanceActual, q) * dq;
+            
+            Jdot_yLeftStanceActual = jacobian(dyLeftStanceActual, q);
+            Jdot_yRightStanceActual = jacobian(dyRightStanceActual, q);
+            
+            % Compile
+            expr{end+1} = SymFunction('yaLeftStance_new', yLeftStanceActual, {q});
+            expr{end+1} = SymFunction('yaRightStance_new', yRightStanceActual, {q});
+            expr{end+1} = SymFunction('dyaLeftStance_new', dyLeftStanceActual, {q, dq});
+            expr{end+1} = SymFunction('dyaRightStance_new', dyRightStanceActual, {q, dq});
+            expr{end+1} = SymFunction('J_yaLeftStance_new', J_yLeftStanceActual, {q});
+            expr{end+1} = SymFunction('J_yaRightStance_new', J_yRightStanceActual, {q});
+            
+            expr{end+1} = SymFunction('J_yaLeftStance_all', J_yLeftStanceActual_all, {q});
+            expr{end+1} = SymFunction('J_yaRightStance_all', J_yRightStanceActual_all, {q});
+            
+            expr{end+1} = SymFunction('Jdot_yLeftStanceActual', Jdot_yLeftStanceActual, {q,dq});
+            expr{end+1} = SymFunction('Jdot_yRightStanceActual', Jdot_yRightStanceActual, {q, dq});
+            
+            expr{end+1} = SymFunction('Dya_LeftStanceActual_new', Dya_LeftStanceActual, {q});
+            expr{end+1} = SymFunction('Dya_RightStanceActual_new', Dya_RightStanceActual, {q});
+            expr{end+1} = SymFunction('DLfya_LeftStanceActual_new', DLfya_LeftStanceActual, {q,dq});
+            expr{end+1} = SymFunction('DLfya_RightStanceActual_new', DLfya_RightStanceActual, {q,dq});
+            
+            % Export the files
+            for i = 1:length(expr)
+                export_fun(expr{i}, export_path, matlab_path);
+            end
+            
+            % Move the files into the appropriate folder for runtime code
+            src_list = dir(strcat(export_path, '/*.cc'));
+            hed_list = dir(strcat(export_path, '/*.hh'));
+            
+            for i = 1:length(src_list)
+                tardir = strcat('./gen/src/' );
+                srcdir = strcat(src_list(i).folder, '/', src_list(i).name );
+                if ~exist(tardir,'dir')
+                    mkdir(char(tardir));
+                end
+                movefile(srcdir,  tardir);
+            end
+            for i = 1:length(hed_list)
+                tardir = strcat('./gen/include/frost_expr/Xiaobin_outputs/' );
+                srcdir= strcat(hed_list(i).folder, '/', hed_list(i).name );
+                if ~exist(tardir,'dir')
+                    mkdir(char(tardir));
+                end
+                movefile(srcdir,  tardir);
+            end
+        end
+        
+        function [] = exportWalkOutputsXiaobinDirectSynthesis_leglength(obj)
+            %%% use hip roll (delta z) difference to replace the pelvis roll outputs.
+            %%% use hip roll to pitch (delta x) difference to replace
+            %%% use vertical COM directly
+            % base
+            module = 'Xiaobin_outputs';
+            export_path = [obj.rpath, '/MATLAB/symbolic/+frost_expr/+', module];
+            matlab_path = [obj.rpath, '/MATLAB/symbolic/+codegen/+',    module];
+            if ~(exist(export_path,'dir') == 7)
+                mkdir(char(export_path));
+            end
+            if ~(exist(matlab_path,'dir') == 7)
+                mkdir(char(matlab_path));
+            end
+            expr = {};
+            % Break out states
+            q   = obj.States.x;
+            dq  = obj.States.dx;
+            ddq = obj.States.ddx;
+            X   = SymVariable([q;dq]);
+            dX  =  SymVariable([dq;ddq]);
+             
+            
+            % Toe Pitch Position
+            left_tp_frame = obj.Joints(getJointIndices(obj, 'LeftFootPitch'));
+            right_tp_frame = obj.Joints(getJointIndices(obj, 'RightFootPitch'));
+            %%%%%%%% step size %%%%%%%%%%%%
+            LeftFootContact = obj.getCartesianPosition(left_tp_frame)';
+            RightFootContact = obj.getCartesianPosition(right_tp_frame)';
+            StepSize_leftStance = RightFootContact -  LeftFootContact;   %%% toe pitch
+            StepLocal_leftStance = StepSize_leftStance.subs(q('BaseRotZ'), 0);
+            StepSagittal_leftStance = StepLocal_leftStance(1);
+            StepLateral_leftStance = StepLocal_leftStance(2);
+            
+            StepSize_rightStance = LeftFootContact - RightFootContact;
+            StepLocal_rightStance = StepSize_rightStance.subs(q('BaseRotZ'), 0);
+            StepSagittal_rightStance = StepLocal_rightStance(1);
+            StepLateral_rightStance = StepLocal_rightStance(2);
+            
+            leftSwingZ =  StepLocal_rightStance(3);
+            rightSwingZ = StepLocal_leftStance(3);
+            
+            % left stance COM relative to stance pivot
+            com = obj.getComPosition();
+            deltaLeftCOM =  com - obj.getCartesianPosition(obj.Joints(getJointIndices(obj, 'LeftFootPitch')));
+            
+            left_COM = deltaLeftCOM(3);
+            
+            
+            deltaRightCOM = com - obj.getCartesianPosition(obj.Joints(getJointIndices(obj, 'RightFootPitch')));
+            
+            right_COM =  deltaRightCOM(3);
+            
+            
+            % pelvis Orientations replacement y(0) & y(1)
+            leftHipPos =  obj.getCartesianPosition(obj.Joints(obj.getJointIndices('LeftHipRoll')))';
+            rightHipPos = obj.getCartesianPosition(obj.Joints(obj.getJointIndices('RightHipRoll')))';
+            deltaRoll =  (leftHipPos(3) - rightHipPos(3))/0.27;
+            deltaPitch = (-q('BasePosZ') + 0.5*leftHipPos(3) + 0.5*rightHipPos(3))/0.049;
+            
+            deltaRoll = eval_math_fun('Simplify', deltaRoll);
+            
+            deltaPitch = eval_math_fun('Simplify', deltaPitch);
+            
+            %%% foot pitch replacement y(8)
+            deltaLeftFoot = obj.ContactPoints.LeftHeel.computeCartesianPosition()- ...
+                obj.ContactPoints.LeftToe.computeCartesianPosition();
+            
+            deltaRightFoot = obj.ContactPoints.RightHeel.computeCartesianPosition()- ...
+                obj.ContactPoints.RightToe.computeCartesianPosition();
+            
+            footLeftPitch = deltaLeftFoot(3)/0.14;
+            footRightPitch = deltaRightFoot(3)/0.14;
+            
+            
+            %             rightSwingZ = rightSwingZ.subs(q(obj.getJointIndices({'RightShinPitch'})), 0);
+            %             rightSwingZ = rightSwingZ.subs(q(obj.getJointIndices({'RightTarsusPitch'})), deg2rad(13) - q(obj.getJointIndices({'RightKneePitch'})));
+            %
+            %             leftSwingZ = leftSwingZ.subs(q(obj.getJointIndices({'LeftShinPitch'})), 0);
+            %             leftSwingZ = leftSwingZ.subs(q(obj.getJointIndices({'LeftTarsusPitch'})), deg2rad(13) - q(obj.getJointIndices({'LeftKneePitch'})));
+            
+            %             left_COM = left_COM.subs(q(obj.getJointIndices({'RightShinPitch'})), 0);
+            %             left_COM = left_COM.subs(q(obj.getJointIndices({'RightTarsusPitch'})), deg2rad(13) - q(obj.getJointIndices({'RightKneePitch'})));
+            %
+            %             right_COM = right_COM.subs(q(obj.getJointIndices({'LeftShinPitch'})), 0);
+            %             right_COM = right_COM.subs(q(obj.getJointIndices({'LeftTarsusPitch'})), deg2rad(13) - q(obj.getJointIndices({'LeftKneePitch'})));
+            %
+            %             left_COM = left_COM.subs(q(obj.getJointIndices({'LeftShinPitch'})), 0);
+            %             left_COM = left_COM.subs(q(obj.getJointIndices({'LeftTarsusPitch'})), deg2rad(13) - q(obj.getJointIndices({'LeftKneePitch'})));
+            %
+            %             right_COM = right_COM.subs(q(obj.getJointIndices({'RightShinPitch'})), 0);
+            %             right_COM = right_COM.subs(q(obj.getJointIndices({'RightTarsusPitch'})), deg2rad(13) - q(obj.getJointIndices({'RightKneePitch'})));
+            
+            yLeftStanceActual = [...
+                deltaRoll;
+                deltaPitch;
+                q('LeftHipYaw');
+                left_COM;
+                rightSwingZ;
+                StepSagittal_leftStance;
+                StepLateral_leftStance;
+                q('RightHipYaw');
+                footRightPitch];
+            
+            yRightStanceActual = [...
+                deltaRoll;
+                deltaPitch;
+                q('RightHipYaw');
+                right_COM;
+                leftSwingZ;
+                StepSagittal_rightStance;
+                StepLateral_rightStance;
+                q('LeftHipYaw');
+                footLeftPitch]; 
+            
+            
+            
+            %0929 added to only control rigid part
+            % Zero compliant elements
+            yLeftStanceActual = yLeftStanceActual.subs(q(obj.getJointIndices({'RightShinPitch'})), 0);
+            yLeftStanceActual = yLeftStanceActual.subs(q(obj.getJointIndices({'RightTarsusPitch'})), deg2rad(13) - q(obj.getJointIndices({'RightKneePitch'})));
+            
+            yRightStanceActual = yRightStanceActual.subs(q(obj.getJointIndices({'LeftShinPitch'})), 0);
+            yRightStanceActual = yRightStanceActual.subs(q(obj.getJointIndices({'LeftTarsusPitch'})), deg2rad(13) - q(obj.getJointIndices({'LeftKneePitch'})));
+            
+            %             % try rigid on stance leg
+            %             yLeftStanceActual = yLeftStanceActual.subs(q(obj.getJointIndices({'LeftShinPitch'})), 0);
+            %             yLeftStanceActual = yLeftStanceActual.subs(q(obj.getJointIndices({'LeftTarsusPitch'})), deg2rad(13) - q(obj.getJointIndices({'LeftKneePitch'})));
+            %
+            %             yRightStanceActual = yRightStanceActual.subs(q(obj.getJointIndices({'RightShinPitch'})), 0);
+            %             yRightStanceActual = yRightStanceActual.subs(q(obj.getJointIndices({'RightTarsusPitch'})), deg2rad(13) - q(obj.getJointIndices({'RightKneePitch'})));
+            %
+
+            %             % Actual
+            %             Dya_LeftStanceActual  = jacobian(yLeftStanceActual,  X);
+            %             Dya_RightStanceActual = jacobian(yRightStanceActual, X);
+            %             % Output Velocity
+            %             dyLeftStanceActual  = jacobian(yLeftStanceActual,  q) * dq;
+            %             dyRightStanceActual = jacobian(yRightStanceActual, q) * dq;
+            
+            RightFootContact = RightFootContact.subs(q('BaseRotZ'), 0);
+            LeftFootContact = LeftFootContact.subs(q('BaseRotZ'), 0);
+            yLeftStanceActual_abscom = [...
+                deltaRoll;
+                deltaPitch;
+                q('LeftHipYaw');
+                com(3);
+                RightFootContact(3);
+                RightFootContact(1);%-LeftFootContact(1);
+                RightFootContact(2);%-LeftFootContact(2);
+                q('RightHipYaw');
+                footRightPitch];
+            
+            yRightStanceActual_abscom = [...
+                deltaRoll;
+                deltaPitch;
+                q('RightHipYaw');
+                com(3);
+                LeftFootContact(3);
+                LeftFootContact(1);%-RightFootContact(1);
+                LeftFootContact(2);%-RightFootContact(2);
+                q('LeftHipYaw');
+                footLeftPitch]; 
+            
+            
+            yLeftStanceActual_abscom = yLeftStanceActual_abscom.subs(q(obj.getJointIndices({'RightShinPitch'})), 0);
+            yLeftStanceActual_abscom = yLeftStanceActual_abscom.subs(q(obj.getJointIndices({'RightTarsusPitch'})), deg2rad(13) - q(obj.getJointIndices({'RightKneePitch'})));
+            
+            yRightStanceActual_abscom = yRightStanceActual_abscom.subs(q(obj.getJointIndices({'LeftShinPitch'})), 0);
+            yRightStanceActual_abscom = yRightStanceActual_abscom.subs(q(obj.getJointIndices({'LeftTarsusPitch'})), deg2rad(13) - q(obj.getJointIndices({'LeftKneePitch'})));
+            
+            
+            
+            Dya_LeftStanceActual  = jacobian(yLeftStanceActual_abscom,  X);
+            Dya_RightStanceActual = jacobian(yRightStanceActual_abscom, X);
+            
+            dyLeftStanceActual  = jacobian(yLeftStanceActual_abscom,  q) * dq;
+            dyRightStanceActual = jacobian(yRightStanceActual_abscom, q) * dq;
+            
+            
+            
+            
+            
+            DLfya_LeftStanceActual  = jacobian(Dya_LeftStanceActual*dX, X);
+            DLfya_RightStanceActual = jacobian(Dya_RightStanceActual*dX, X);
+            
+            
+            
+            % Compile
+            expr{end+1} = SymFunction('yaLeftStance_new', yLeftStanceActual, {q});
+            expr{end+1} = SymFunction('yaRightStance_new', yRightStanceActual, {q});
+            expr{end+1} = SymFunction('dyaLeftStance_new', dyLeftStanceActual, {q, dq});
+            expr{end+1} = SymFunction('dyaRightStance_new', dyRightStanceActual, {q, dq});
+            expr{end+1} = SymFunction('Dya_LeftStanceActual_new', Dya_LeftStanceActual, {q});
+            expr{end+1} = SymFunction('Dya_RightStanceActual_new', Dya_RightStanceActual, {q});
+            expr{end+1} = SymFunction('DLfya_LeftStanceActual_new', DLfya_LeftStanceActual, {q,dq});
+            expr{end+1} = SymFunction('DLfya_RightStanceActual_new', DLfya_RightStanceActual, {q,dq});
+            
+            % Export the files
+            for i = 1:length(expr)
+                export_fun(expr{i}, export_path, matlab_path);
+            end
+            
+            % Move the files into the appropriate folder for runtime code
+            src_list = dir(strcat(export_path, '/*.cc'));
+            hed_list = dir(strcat(export_path, '/*.hh'));
+            
+            for i = 1:length(src_list)
+                tardir = strcat('./gen/src/' );
+                srcdir = strcat(src_list(i).folder, '/', src_list(i).name );
+                if ~exist(tardir,'dir')
+                    mkdir(char(tardir));
+                end
+                movefile(srcdir,  tardir);
+            end
+            for i = 1:length(hed_list)
+                tardir = strcat('./gen/include/frost_expr/Xiaobin_outputs/' );
+                srcdir= strcat(hed_list(i).folder, '/', hed_list(i).name );
+                if ~exist(tardir,'dir')
+                    mkdir(char(tardir));
+                end
+                movefile(srcdir,  tardir);
+            end
+        end
+        
+        
+        
+        
     end
 end

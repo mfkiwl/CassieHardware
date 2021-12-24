@@ -1,8 +1,10 @@
 file(REMOVE_RECURSE
-  "CMakeFiles/cassieplugin.dir/src/udp.c.o"
-  "CMakeFiles/cassieplugin.dir/src/CassiePlugin.cpp.o"
   "/home/xiaobin/cassie_ws/devel/lib/libcassieplugin.pdb"
   "/home/xiaobin/cassie_ws/devel/lib/libcassieplugin.so"
+  "CMakeFiles/cassieplugin.dir/src/CassiePlugin.cpp.o"
+  "CMakeFiles/cassieplugin.dir/src/CassiePlugin.cpp.o.d"
+  "CMakeFiles/cassieplugin.dir/src/udp.c.o"
+  "CMakeFiles/cassieplugin.dir/src/udp.c.o.d"
 )
 
 # Per-language clean rules from dependency scanning.

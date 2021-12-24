@@ -12,4 +12,6 @@
     (:file "_package_cassie_estimation_msg" :depends-on ("_package"))
     (:file "cassie_proprioception_msg" :depends-on ("_package_cassie_proprioception_msg"))
     (:file "_package_cassie_proprioception_msg" :depends-on ("_package"))
+    (:file "cassie_velocity_estimation_msg" :depends-on ("_package_cassie_velocity_estimation_msg"))
+    (:file "_package_cassie_velocity_estimation_msg" :depends-on ("_package"))
   ))

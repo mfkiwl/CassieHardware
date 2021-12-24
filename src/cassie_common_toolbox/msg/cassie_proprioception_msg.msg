@@ -10,3 +10,5 @@ geometry_msgs/Vector3    linear_acceleration
 float64[2]               q_achilles
 float64[2]               dq_achilles
 float64[2]               contact
+bool                     isCalibrated
+

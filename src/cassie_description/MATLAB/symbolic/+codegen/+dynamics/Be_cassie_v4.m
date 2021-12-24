@@ -6,7 +6,7 @@
 % 	 https://github.com/ayonga/frost-dev
 % 
 % Author: Jenna Reher (jreher@caltech.edu)
-% Automatically generated on: February 02, 2021 T 01:46
+% Automatically generated on: August 28, 2021 T 03:46
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function out = Be_cassie_v4(var1)
 

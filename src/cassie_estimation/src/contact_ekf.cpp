@@ -1,25 +1,4 @@
 /*
- * MIT License
- *
- * Copyright (c) 2020 Jenna Reher (jreher@caltech.edu)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
 */
 
 #include <cassie_estimation/contact_ekf.hpp>
@@ -77,7 +56,7 @@ void contact_ekf::Memory::reset() {
     this->dencoders_prev.setZero();
     this->contact_prev.setZero();
 
-     this->v_init.setZero();
+    this->v_init.setZero();
 }
 
 void contact_ekf::Config::init() {
@@ -151,7 +130,6 @@ contact_ekf::contact_ekf(ros::NodeHandle &nh, cassie_model::Cassie &robot, bool 
 
     // Parameter checker
     this->config.paramChecker.init(nh.getNamespace() + "/contact_ekf");
-
     // Service for calling reconfigures
     this->reconfigureService = nh.advertiseService("reconfigure_contact_ekf", &contact_ekf::reconfigure, this);
     this->reconfigure();
@@ -194,7 +172,6 @@ bool contact_ekf::isEnabled() {
 
 void contact_ekf::getValues(Matrix3d &R, Vector3d &p, Vector3d &v, Vector3d &ba, Vector3d &bg, Vector3d &plf, Vector3d &prf, Vector2d &footYaws) {
     unpackState(this->memory.X, R, p, v, ba, bg, plf, prf, footYaws);
-
     if (this->config.apply_post_filter)
         v << this->lpVX.getValue(), this->lpVY.getValue(), this->lpVZ.getValue();
 }
@@ -209,7 +186,6 @@ void contact_ekf::update(double dt, VectorXd &w, VectorXd &a, VectorXd &encoders
     // Initialize bias
     // (does nothing if bias is already initialized)
     this->initializeBias(w, a);
-
     // Check dt and clamp for safety
     if (dt < 0.0001)
         dt = 0.0001;
@@ -325,6 +301,7 @@ void contact_ekf::predict_state(double dt) {
     Matrix3d R;
     Vector2d footYaws;
     Vector3d p, v, ba, bg, pRF, pLF;
+
     unpackState(this->memory.X, R, p, v, ba, bg, pLF, pRF, footYaws);
     Matrix3d Rt = R.transpose();
 
@@ -568,29 +545,7 @@ void contact_ekf::update_forward_kinematics(VectorXd &w, VectorXd &encoders, Vec
     prf += dx.block(18,0,3,1);
     footYaws += dx.block(21,0,2,1);
     packState(this->memory.X, R, p, v, ba, bw, plf, prf, footYaws);
-}
 
-void contact_ekf::unpackState(MatrixXd &X, Matrix3d &R, Vector3d &p, Vector3d &v, Vector3d &ba, Vector3d &bw, Vector3d &plf, Vector3d &prf, Vector2d &footYaws) {
-    R << X.block(0,0,3,3);
-    p << X.col(3);
-    v << X.col(4);
-    ba << X.col(5);
-    bw << X.col(6);
-    plf << X.col(7);
-    prf << X.col(8);
-    footYaws(0) = X(0,9);
-    footYaws(1) = X(1,9);
-}
-
-void contact_ekf::packState(MatrixXd &X, Matrix3d &R, Vector3d &p, Vector3d &v, Vector3d &ba, Vector3d &bw, Vector3d &plf, Vector3d &prf, Vector2d &footYaws) {
-    X.block(0,0,3,3) << R;
-    X.col(3) << p;
-    X.col(4) << v;
-    X.col(5) << ba;
-    X.col(6) << bw;
-    X.col(7) << plf;
-    X.col(8) << prf;
-    X.col(9) << footYaws, 0.0;
 }
 
 void contact_ekf::relative_foot_positions(VectorXd &enc, Vector3d &plf, Vector3d &prf, Matrix3d &Rlf, Matrix3d &Rrf) {
@@ -628,7 +583,8 @@ void contact_ekf::relative_foot_positions(VectorXd &enc, Vector3d &plf, Vector3d
 }
 
 void contact_ekf::relative_foot_jacobians(VectorXd &enc, MatrixXd &Jlf, MatrixXd &Jrf, MatrixXd &JrotLF_enc, MatrixXd &JrotRF_enc) {
-    VectorXd q(22); q.setZero();
+    VectorXd q(22);
+    q.setZero();
     for (int i=0; i<this->robot->iEncoderMap.size(); i++)
         q(this->robot->iEncoderMap(i)) = enc(i);
 
@@ -646,6 +602,7 @@ void contact_ekf::relative_foot_jacobians(VectorXd &enc, MatrixXd &Jlf, MatrixXd
     }
 }
 
+/////////////////// support functions ////////////////////////////////////////////////
 int contact_ekf::factorial(int n)
 {
     // single line to find factorial
@@ -704,3 +661,27 @@ Matrix3d contact_ekf::Gamma(Vector3d w, int n) {
     }
     return output;
 }
+
+void contact_ekf::unpackState(MatrixXd &X, Matrix3d &R, Vector3d &p, Vector3d &v, Vector3d &ba, Vector3d &bw, Vector3d &plf, Vector3d &prf, Vector2d &footYaws) {
+    R << X.block(0,0,3,3);
+    p << X.col(3);
+    v << X.col(4);
+    ba << X.col(5);
+    bw << X.col(6);
+    plf << X.col(7);
+    prf << X.col(8);
+    footYaws(0) = X(0,9);
+    footYaws(1) = X(1,9);
+}
+
+void contact_ekf::packState(MatrixXd &X, Matrix3d &R, Vector3d &p, Vector3d &v, Vector3d &ba, Vector3d &bw, Vector3d &plf, Vector3d &prf, Vector2d &footYaws) {
+    X.block(0,0,3,3) << R;
+    X.col(3) << p;
+    X.col(4) << v;
+    X.col(5) << ba;
+    X.col(6) << bw;
+    X.col(7) << plf;
+    X.col(8) << prf;
+    X.col(9) << footYaws, 0.0;
+}
+

@@ -7,13 +7,14 @@
 % Date: March 25, 2019
 % ________________________________________
 % Generate path to MATLAB description
-frost_addpath;
+% frost_addpath;
 addpath(genpath('MATLAB'));
-
+addpath(genpath('MATLAB/symbolic/+codegen'));
 % Load the robot's articulated tree from URDF
 is_rigid = false;
 is_planar = false;
 robot = Cassie_v4('urdf/cassie_v4.urdf', is_planar, is_rigid); % Model including compliant spring elements
 
 % Use the internal functions to generate files
-robot.exportAll;
+% robot.exportAll;
+% robot.exportKinematics;

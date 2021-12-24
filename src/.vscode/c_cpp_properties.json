@@ -1,0 +1,40 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "",
+        "limitSymbolsToIncludedHeaders": true
+      },
+      "includePath": [
+        "/home/xiaobin/robot_local_ws/devel/include/**",
+        "/home/xiaobin/catkin_ws/devel/include/**",
+        "/home/xiaobin/cassie_ws/devel/include/**",
+        "/opt/ros/melodic/include/**",
+        "/home/xiaobin/cassie_ws/src/amber_developer_stack/alt_math_utilities/include/**",
+        "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/include/**",
+        "/home/xiaobin/cassie_ws/src/cassie_controllers/include/**",
+        "/home/xiaobin/cassie_ws/src/cassie_description/include/**",
+        "/home/xiaobin/cassie_ws/src/cassie_estimation/include/**",
+        "/home/xiaobin/cassie_ws/src/cassie_interface/include/**",
+        "/home/xiaobin/cassie_ws/src/amber_developer_stack/common_assert/include/**",
+        "/home/xiaobin/cassie_ws/src/amber_developer_stack/control_eigen_utilities/include/**",
+        "/home/xiaobin/cassie_ws/src/amber_developer_stack/control_utilities/include/**",
+        "/home/xiaobin/cassie_ws/src/amber_developer_stack/eigen_utilities/include/**",
+        "/home/xiaobin/catkin_ws/src/mujoco_ros_pkgs/mujoco_ros_control/include/**",
+        "/home/xiaobin/cassie_ws/src/amber_developer_stack/qpoases_ros/include/**",
+        "/home/xiaobin/catkin_ws/src/realsense-ros/realsense2_camera/include/**",
+        "/home/xiaobin/cassie_ws/src/amber_developer_stack/realtime_utilities/include/**",
+        "/home/xiaobin/robot_local_ws/src/robot_localization/include/**",
+        "/home/xiaobin/cassie_ws/src/amber_developer_stack/ros_utilities/include/**",
+        "/home/xiaobin/cassie_ws/src/amber_developer_stack/roslib_utilities/include/**",
+        "/home/xiaobin/cassie_ws/src/amber_developer_stack/stl_utilities/include/**",
+        "/home/xiaobin/cassie_ws/src/amber_developer_stack/yaml_cpp_0_2_7/include/**",
+        "/home/xiaobin/cassie_ws/src/amber_developer_stack/yaml_eigen_utilities/include/**",
+        "/home/xiaobin/cassie_ws/src/amber_developer_stack/yaml_utilities/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS"
+    }
+  ],
+  "version": 4
+}

@@ -12,6 +12,8 @@ class PhaseVariable {
 public:
     double tau;
     double dtau;
+    double pActual;
+    double dpActual;
 
     PhaseVariable();
     void update(double time);
@@ -20,8 +22,7 @@ public:
 
 private:
     double timeScale;
-    double pActual;
-    double dpActual;
+
 
     Eigen::Vector2d phaseRange;
 

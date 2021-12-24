@@ -55,11 +55,25 @@ include_directories(include ${catkin_INCLUDE_DIRS})
 # Create controller libraries
 add_library(${PROJECT_NAME}
     src/standing_control_qp.cpp
+    src/inverse_kinematics.cpp
     src/walking_onedomain.cpp
-    src/inverse_kinematics.cpp)
+    src/IDCLFQPsolver.cpp
+    src/OUTPUT_HZD.cpp
+    src/OUTPUT_HLIP.cpp
+        )
+
 add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
 
 # Main state machine node for handling locomotion controllers
 add_executable(locomotion_node src/locomotion_node.cpp)
 target_link_libraries(locomotion_node ${catkin_LIBRARIES} ${PROJECT_NAME})
+
+# NEW Main state machine node for handling locomotion controllers
+add_executable(locomotion_node_new src/locomotion_node_new.cpp)
+target_link_libraries(locomotion_node_new ${catkin_LIBRARIES} ${PROJECT_NAME})
+
+
+
+
+    

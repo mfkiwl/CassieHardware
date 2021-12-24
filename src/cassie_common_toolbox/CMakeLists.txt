@@ -21,7 +21,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## Declare ROS messages, services and actions ##
 ################################################
 # Specify custom messages
-add_message_files(DIRECTORY msg FILES cassie_control_msg.msg cassie_estimation_msg.msg cassie_proprioception_msg.msg)
+add_message_files(DIRECTORY msg FILES cassie_control_msg.msg cassie_estimation_msg.msg cassie_proprioception_msg.msg cassie_velocity_estimation_msg.msg)
 
 # Generate added messages
 generate_messages(DEPENDENCIES std_msgs geometry_msgs)

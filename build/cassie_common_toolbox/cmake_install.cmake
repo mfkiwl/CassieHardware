@@ -37,11 +37,17 @@ if(NOT DEFINED CMAKE_CROSSCOMPILING)
   set(CMAKE_CROSSCOMPILING "FALSE")
 endif()
 
+# Set default install directory permissions.
+if(NOT DEFINED CMAKE_OBJDUMP)
+  set(CMAKE_OBJDUMP "/usr/bin/objdump")
+endif()
+
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/cassie_common_toolbox/msg" TYPE FILE FILES
     "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_control_msg.msg"
     "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_estimation_msg.msg"
     "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_proprioception_msg.msg"
+    "/home/xiaobin/cassie_ws/src/cassie_common_toolbox/msg/cassie_velocity_estimation_msg.msg"
     )
 endif()
 
