@@ -53,6 +53,7 @@ static long long get_microseconds(void)
 static VectorXd u(10);
 static ros_utilities::Timer timeout_timer(true);
 static ros_utilities::Timer estimation_realtime_timer(true);
+static double double tMujoco = 0;
 
 // Callback for controller subscriber
 void controller_callback(const cassie_common_toolbox::cassie_control_msg::ConstPtr &controlmsg)
@@ -65,6 +66,7 @@ void controller_callback(const cassie_common_toolbox::cassie_control_msg::ConstP
 }
 
 void processProprioception_msg(cassie_out_t &cassie_out);
+void FakeJoystickCmd(cassie_out_t &cassie_out);
 
 // Main node
 int main(int argc, char *argv[])
@@ -89,7 +91,7 @@ int main(int argc, char *argv[])
     VectorXd safe_torque_limit(10);
     ros::param::get("/cassie/interface/safe_torque_limit", stl);
     yaml_utilities::yaml_read_string(stl, safe_torque_limit);
-    cout << "Using safe torque limit: " << safe_torque_limit.transpose() << sendl;
+    cout << "Using safe torque limit: " << safe_torque_limit.transpose() << endl;
 
     //////////////////////// Mujoco Setup /////////////////////////////////////////////////
     bool visualize = true;
@@ -182,6 +184,7 @@ int main(int argc, char *argv[])
             achillesSolver.update();
             contact.update();
 
+            FakeJoystickCmd(cassie_out);  
 
             // Populate kinematics terms
             proprioception_msg.encoder_position[4] = robot.q(LeftShinPitch);
@@ -237,8 +240,9 @@ int main(int argc, char *argv[])
             proprioception_msg.linear_velocity.z = vel[2];
 
             double *timeMujoP = cassie_sim_time(sim);
-            double tMujo = *timeMujoP;
-            // cout << "Mujo Ros Time Diff:" << tMujo - (ros::Time::now().toSec()- tNodeStart) << endl;
+            tMujoco = *timeMujoP;
+            cout << "MujocoTime:"  << tMujoco << endl;
+            // out << "Mujo Ros Time Diff:" << tMujo - (ros::Time::now().toSec()- tNodeStart) << endl;
             // Do simulation
             
 
@@ -309,7 +313,7 @@ int main(int argc, char *argv[])
 
 
 void FakeJoystickCmd(cassie_out_t &cassie_out){
-if (ros::Time::now().toSec() > 1)
+if (tMujoco > 1)
 {
     // Crouch simulation
     // cassie_out.pelvis.radio.channel[SH] = -1.0;
@@ -317,19 +321,19 @@ if (ros::Time::now().toSec() > 1)
     // Walk simulation
     // cassie_out.pelvis.radio.channel[SB] = 1.0;
 
-    if (ros::Time::now().toSec() > 25.0)
+    if (tMujoco > 25.0)
         cassie_out.pelvis.radio.channel[LV] = 1.;
-    if (ros::Time::now().toSec() > 45.0)
+    if (tMujoco > 45.0)
         cassie_out.pelvis.radio.channel[LV] = 0.;
-    if (ros::Time::now().toSec() > 55.0)
+    if (tMujoco > 55.0)
         cassie_out.pelvis.radio.channel[LV] = -1.;
-    if (ros::Time::now().toSec() > 65.0)
+    if (tMujoco > 65.0)
         cassie_out.pelvis.radio.channel[LV] = 0.;
-    if (ros::Time::now().toSec() > 75.0)
+    if (tMujoco > 75.0)
         cassie_out.pelvis.radio.channel[LH] = 1.;
-    if (ros::Time::now().toSec() > 85.0)
+    if (tMujoco > 85.0)
         cassie_out.pelvis.radio.channel[LH] = 0.;
-    if (ros::Time::now().toSec() > 95.0)
+    if (tMujoco > 95.0)
     {
         cassie_out.pelvis.radio.channel[LH] = -0.50;
         cassie_out.pelvis.radio.channel[LV] = 0.50;
