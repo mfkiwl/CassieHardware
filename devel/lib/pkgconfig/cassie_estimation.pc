@@ -1,8 +1,0 @@
-prefix=/home/xiaobin/cassie_ws/devel
-
-Name: cassie_estimation
-Description: Description of cassie_estimation
-Version: 0.0.0
-Cflags: -I/home/xiaobin/cassie_ws/src/cassie_estimation/include
-Libs: -L${prefix}/lib -lcassie_estimation
-Requires: roscpp cassie_description

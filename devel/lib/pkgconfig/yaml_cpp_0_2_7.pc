@@ -1,8 +1,0 @@
-prefix=/home/xiaobin/cassie_ws/devel
-
-Name: yaml_cpp_0_2_7
-Description: Description of yaml_cpp_0_2_7
-Version: 0.2.7
-Cflags: -I/home/xiaobin/cassie_ws/src/amber_developer_stack/yaml_cpp_0_2_7/include
-Libs: -L${prefix}/lib -lyaml-cpp-0.2.7
-Requires: 
