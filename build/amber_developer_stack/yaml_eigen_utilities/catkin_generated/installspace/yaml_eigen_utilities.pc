@@ -1,8 +1,0 @@
-prefix=/home/xiaobin/cassie_ws/install
-
-Name: yaml_eigen_utilities
-Description: Description of yaml_eigen_utilities
-Version: 0.0.0
-Cflags: -I${prefix}/include -I/usr/include/eigen3
-Libs: -L${prefix}/lib 
-Requires: yaml_utilities common_assert

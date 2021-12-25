@@ -1,8 +1,0 @@
-prefix=/home/xiaobin/cassie_ws/install
-
-Name: cassie_interface
-Description: Description of cassie_interface
-Version: 0.0.0
-Cflags: -I${prefix}/include
-Libs: -L${prefix}/lib -lcassie_interface
-Requires: roscpp cassie_estimation

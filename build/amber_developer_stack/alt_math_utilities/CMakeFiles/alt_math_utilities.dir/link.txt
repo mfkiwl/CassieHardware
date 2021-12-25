@@ -1,1 +1,0 @@
-/usr/bin/c++ -fPIC -O3 -DNDEBUG  -shared -Wl,-soname,libalt_math_utilities.so -o /home/xiaobin/cassie_ws/devel/lib/libalt_math_utilities.so CMakeFiles/alt_math_utilities.dir/src/PowFast.cpp.o 
