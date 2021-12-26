@@ -1,5 +1,5 @@
 /*
- to do: replace gazebo by mujoco 
+ to do: replace gazebo by mujoco
 */
 #include <stdbool.h>
 #include <stdlib.h>
@@ -38,39 +38,38 @@ using namespace std;
 
 cassie_common_toolbox::cassie_proprioception_msg proprioception_msg;
 
-static cassie_user_in_t cassie_user_in = {0};
+// Common Variables
+static cassie_user_in_t cassie_user_in = { 0 };
 static cassie_out_t cassie_out;
 
-static long long get_microseconds(void)
-{
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    return now.tv_sec * 1000000 + now.tv_nsec / 1000;
-}
-///////////////////////////////////////////////////
-
-// Variable for control
 static VectorXd u(10);
 static ros_utilities::Timer timeout_timer(true);
-static ros_utilities::Timer estimation_realtime_timer(true);
-static double double tMujoco = 0;
+static double tMujoco = 0;
 
 // Callback for controller subscriber
-void controller_callback(const cassie_common_toolbox::cassie_control_msg::ConstPtr &controlmsg)
-{
+void controller_callback(const cassie_common_toolbox::cassie_control_msg::ConstPtr& controlmsg) {
     timeout_timer.restart();
-    for (unsigned long i = 0; i < 10; i++)
-    {
+    for (unsigned long i = 0; i < 10; i++) {
         u[i] = controlmsg->motor_torque[i];
     }
 }
 
-void processProprioception_msg(cassie_out_t &cassie_out);
-void FakeJoystickCmd(cassie_out_t &cassie_out);
+static long long get_microseconds(void) {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return now.tv_sec * 1000000 + now.tv_nsec / 1000;
+}
 
-// Main node
-int main(int argc, char *argv[])
-{
+void processProprioception_msg();
+
+void CheatWithSimulationVel(cassie_sim_t* sim);
+
+void logSimulation(fstream& logfile);
+
+void FakeJoystickCmd();
+
+///////////////////////////// Main node ////////////////////////////////////////////
+int main(int argc, char* argv[]) {
     ///////////////////////// CONFIG ///////////////////////////
     // Establish the current ROS node and associated timing
     ros::init(argc, argv, "cassie_interface");
@@ -78,10 +77,7 @@ int main(int argc, char *argv[])
     ros::Rate looprate(2000); // Run at 2 kHz
 
     double tNodeStart = ros::Time::now().toSec();
-    // Check if the simulated joystick command is enabled!
-    bool isSim = true;
     timeout_timer.start();
-    estimation_realtime_timer.start();
 
     int control_mode;
     ros::param::get("/cassie/locomotion_control/HLIP/control_mode", control_mode);
@@ -100,14 +96,16 @@ int main(int argc, char *argv[])
     ROS_INFO("Using Mujoco Simulator");
     // Create cassie simulation
     const char modelfile[] = "/home/xiaobin/cassie_ws/src/cassie_interface/model/cassie.xml";
-    cassie_sim_t *sim = cassie_sim_init(modelfile, false);
-    cassie_vis_t *vis;
+    cassie_sim_t* sim = cassie_sim_init(modelfile, false);
+    cassie_vis_t* vis;
+    double* timeMujoP = cassie_sim_time(sim);
+
     if (visualize)
         vis = cassie_vis_init(sim, modelfile, false);
     if (hold)
         cassie_sim_hold(sim);
 
-    // Manage simulation loop
+    // Manage simulation loop, use for control display HZ
     unsigned long long loop_counter = 0;
 
     ////////////////////////////////////////////////////////////////////////////////////
@@ -122,24 +120,19 @@ int main(int argc, char *argv[])
     cassie_model::Cassie robot;
     ContactClassifier contact(nh, robot, 0.0005);
     HeelspringSolver achillesSolver(nh, robot);
-    KinematicsHipVelocityEstimator velocityEstimator(nh, robot, true);
-    contact_ekf ekf(nh, robot, true);
 
     // Whether to log data
-    VectorXf log = VectorXf::Zero(66);
     std::fstream logfile;
     bool log_interface = false;
     ros::param::get("/cassie/log_interface", log_interface);
-    if (log_interface)
-    {
+    if (log_interface) {
         std::string home = getenv("HOME");
         std::string path = home + "/datalog/interface_log.bin";
         logfile.open(path, std::ios::out | std::ios::binary);
     }
 
     // Listen/respond loop
-    while (ros::ok())
-    {
+    while (ros::ok()) {
         // Spin ROS once to get updated control values
         ros::spinOnce();
 
@@ -150,13 +143,11 @@ int main(int argc, char *argv[])
             for (unsigned long i = 0; i < 10; i++)
                 u[i] = 0.0;
         }
-        else
-        {
+        else {
             control_eigen_utilities::clamp(u, -safe_torque_limit, safe_torque_limit); // Apply saturation
         }
         // process controller and send
-        for (unsigned int i = 0; i < 10; i++)
-        {
+        for (unsigned int i = 0; i < 10; i++) {
             cassie_user_in.torque[i] = u[i];
         }
 
@@ -169,10 +160,14 @@ int main(int argc, char *argv[])
         if (!cassie_vis_paused(vis))
             cassie_sim_step(sim, &cassie_out, &cassie_user_in);
 
+        tMujoco = *timeMujoP;
+        cout << "MujocoTime:" << tMujoco << endl;
+        // out << "Mujo Ros Time Diff:" << tMujo - (ros::Time::now().toSec()- tNodeStart) << endl;
         ///////////////////////////////////////////////////////
-        processProprioception_msg(cassie_out);
+        FakeJoystickCmd();
+        processProprioception_msg();
 
-        // Get encoder positions
+        // Get encoder positions and pass them to robot object
         robot.q.setZero();
         robot.dq.setZero();
         get_proprioception_encoders(proprioception_msg, robot.q, robot.dq);
@@ -181,20 +176,8 @@ int main(int argc, char *argv[])
         if (cassie_out.isCalibrated) // cassie is calibrated in sim when the sim starts.
         {
             // Update contact / achilles and export
-            achillesSolver.update();
+            achillesSolver.update();   // use the closed loop chain to calaculate the heel spring deflection
             contact.update();
-
-            FakeJoystickCmd(cassie_out);  
-
-            // Populate kinematics terms
-            proprioception_msg.encoder_position[4] = robot.q(LeftShinPitch);
-            proprioception_msg.encoder_position[5] = robot.q(LeftTarsusPitch);
-            proprioception_msg.encoder_position[11] = robot.q(RightShinPitch);
-            proprioception_msg.encoder_position[12] = robot.q(RightTarsusPitch);
-            proprioception_msg.encoder_velocity[4] = robot.dq(LeftShinPitch);
-            proprioception_msg.encoder_velocity[5] = robot.dq(LeftTarsusPitch);
-            proprioception_msg.encoder_velocity[11] = robot.dq(RightShinPitch);
-            proprioception_msg.encoder_velocity[12] = robot.dq(RightTarsusPitch);
 
             proprioception_msg.q_achilles[0] = robot.q(LeftHeelSpring);
             proprioception_msg.q_achilles[1] = robot.q(RightHeelSpring);
@@ -203,106 +186,14 @@ int main(int argc, char *argv[])
             proprioception_msg.contact[0] = robot.leftContact;
             proprioception_msg.contact[1] = robot.rightContact;
 
-            // Break out measured quantities
-            VectorXd w(3), a(3);
-            w << proprioception_msg.angular_velocity.x, proprioception_msg.angular_velocity.y, proprioception_msg.angular_velocity.z;
-            a << proprioception_msg.linear_acceleration.x, proprioception_msg.linear_acceleration.y, proprioception_msg.linear_acceleration.z;
-            VectorXd encoder(14), dencoder(14), con(2);
-            for (int i = 0; i < 14; i++)
-            {
-                encoder(i) = proprioception_msg.encoder_position[i];
-                dencoder(i) = proprioception_msg.encoder_velocity[i];
-            }
-            con << robot.leftContact, robot.rightContact;
-
-            cassie_out.pelvis.radio.channel[SA] = 1.0;
-            cassie_out.pelvis.radio.channel[SB] = 0.;
-
-            // Use real velocity from gazebo
-            Eigen::Quaterniond quat;
-            quat.w() = proprioception_msg.orientation.w;
-            quat.x() = proprioception_msg.orientation.x;
-            quat.y() = proprioception_msg.orientation.y;
-            quat.z() = proprioception_msg.orientation.z;
-            Eigen::EulerAnglesXYZd euler;
-            eulerXYZ(quat, euler);
-            Eigen::Matrix3d Rz;
-            Rz << cos(euler.gamma()), -sin(euler.gamma()), 0,
-                sin(euler.gamma()), cos(euler.gamma()), 0,
-                0, 0, 1;
-            double comVel[3];
-            cassie_sim_cm_velocity(sim, comVel); // this is getting COM velocity from Mujoco; TODO: just get the base velocity
-            Vector3d vel(comVel[0], comVel[1], comVel[2]);
-            vel = Rz.transpose() * vel;
-
-            proprioception_msg.linear_velocity.x = vel[0];
-            proprioception_msg.linear_velocity.y = vel[1];
-            proprioception_msg.linear_velocity.z = vel[2];
-
-            double *timeMujoP = cassie_sim_time(sim);
-            tMujoco = *timeMujoP;
-            cout << "MujocoTime:"  << tMujoco << endl;
-            // out << "Mujo Ros Time Diff:" << tMujo - (ros::Time::now().toSec()- tNodeStart) << endl;
-            // Do simulation
-            
-
-            // Radio is all zero until the robot is calibrated. Extra safety precaution.
-            for (unsigned int i = 0; i < 16; i++)
-                proprioception_msg.radio[i] = cassie_out.pelvis.radio.channel[i];
+            CheatWithSimulationVel(sim);  // otherwise, use an estimator to pass velocity to proprioception_msg
 
             // publish 
             proprioception_msg.header.stamp = ros::Time::now();
             proprioception_pub.publish(proprioception_msg);
-
-            //////////////////////////////////////////////////////////////////////////////////////////////
             // Write log
-            if (log_interface)
-            {
-                {
-                    double tsec = static_cast<double>(ros::Time::now().sec);
-                    double tnsec = static_cast<double>(ros::Time::now().nsec) * 1e-9;
-                    // Move zero to closer time rather than 1970 so it fits in a float
-                    // Still bad practice to put time in floats, but this is just for logging
-                    if (!isSim)
-                        tsec -= 1.6074545e9;
-
-                    // Get the mean voltage measured on the DC bus input to the motors
-                    double voltage = 0.;
-                    voltage = (cassie_out.leftLeg.hipRollDrive.dcLinkVoltage + cassie_out.leftLeg.hipYawDrive.dcLinkVoltage + cassie_out.leftLeg.hipPitchDrive.dcLinkVoltage + cassie_out.leftLeg.kneeDrive.dcLinkVoltage + cassie_out.leftLeg.hipRollDrive.dcLinkVoltage + cassie_out.rightLeg.footDrive.dcLinkVoltage + cassie_out.rightLeg.hipYawDrive.dcLinkVoltage + cassie_out.rightLeg.hipPitchDrive.dcLinkVoltage + cassie_out.rightLeg.kneeDrive.dcLinkVoltage + cassie_out.rightLeg.footDrive.dcLinkVoltage) / 10.;
-
-                    // Convert torques to current
-                    // current = torque / (gearRatio * motorConstant)
-                    // gear ratio and motorConstant obtained from Agility Robotics
-                    double motorCurrent = 0.;
-                    motorCurrent = fabs(cassie_out.leftLeg.hipRollDrive.torque * 0.30769230769) + fabs(cassie_out.leftLeg.hipYawDrive.torque * 0.30769230769) + fabs(cassie_out.leftLeg.hipPitchDrive.torque * 0.23148148148) + fabs(cassie_out.leftLeg.kneeDrive.torque * 0.23148148148) + fabs(cassie_out.leftLeg.footDrive.torque * 0.35087719298) + fabs(cassie_out.rightLeg.hipRollDrive.torque * 0.30769230769) + fabs(cassie_out.rightLeg.hipYawDrive.torque * 0.30769230769) + fabs(cassie_out.rightLeg.hipPitchDrive.torque * 0.23148148148) + fabs(cassie_out.rightLeg.kneeDrive.torque * 0.23148148148) + fabs(cassie_out.rightLeg.footDrive.torque * 0.35087719298);
-
-                    // Use floats for logging size and speed
-                    log << static_cast<float>(tsec), static_cast<float>(tnsec), // 2                                                                                                             // 1
-                        static_cast<float>(proprioception_msg.orientation.w),
-                        static_cast<float>(proprioception_msg.orientation.x),
-                        static_cast<float>(proprioception_msg.orientation.y),
-                        static_cast<float>(proprioception_msg.orientation.z), // 4
-                        static_cast<float>(proprioception_msg.angular_velocity.x),
-                        static_cast<float>(proprioception_msg.angular_velocity.y),
-                        static_cast<float>(proprioception_msg.angular_velocity.z), // 3
-                        static_cast<float>(proprioception_msg.linear_acceleration.x),
-                        static_cast<float>(proprioception_msg.linear_acceleration.y),
-                        static_cast<float>(proprioception_msg.linear_acceleration.z), // 3
-                        static_cast<float>(proprioception_msg.linear_velocity.x),
-                        static_cast<float>(proprioception_msg.linear_velocity.y),
-                        static_cast<float>(proprioception_msg.linear_velocity.z), // 3
-                        encoder.cast<float>(),                                    // 14
-                        dencoder.cast<float>(),                                   // 14
-                        static_cast<float>(proprioception_msg.q_achilles[0]),
-                        static_cast<float>(proprioception_msg.q_achilles[1]), // 2
-                        static_cast<float>(proprioception_msg.dq_achilles[0]),
-                        static_cast<float>(proprioception_msg.dq_achilles[1]), // 2
-                        static_cast<float>(proprioception_msg.contact[0]),
-                        static_cast<float>(proprioception_msg.contact[1]),
-                        static_cast<float>(motorCurrent), //cassie_out.pelvis.battery.current),
-                        static_cast<float>(voltage);
-                    logfile.write(reinterpret_cast<char *>(log.data()), (log.size()) * sizeof(float));
-                }
+            if (log_interface) {
+                logSimulation(logfile);
             }
             looprate.sleep();
         }
@@ -311,38 +202,37 @@ int main(int argc, char *argv[])
         logfile.close();
 }
 
+void FakeJoystickCmd() {
+    cassie_out.pelvis.radio.channel[SA] = 1.0;
+    cassie_out.pelvis.radio.channel[SB] = 0.;
+    if (tMujoco > 1) {
+        // Crouch simulation
+        // cassie_out.pelvis.radio.channel[SH] = -1.0;
+        //  cout << "ROS time:" << ros::Time::now().toSec() << endl;
+        // Walk simulation
+        // cassie_out.pelvis.radio.channel[SB] = 1.0;
 
-void FakeJoystickCmd(cassie_out_t &cassie_out){
-if (tMujoco > 1)
-{
-    // Crouch simulation
-    // cassie_out.pelvis.radio.channel[SH] = -1.0;
-    //  cout << "ROS time:" << ros::Time::now().toSec() << endl;
-    // Walk simulation
-    // cassie_out.pelvis.radio.channel[SB] = 1.0;
-
-    if (tMujoco > 25.0)
-        cassie_out.pelvis.radio.channel[LV] = 1.;
-    if (tMujoco > 45.0)
-        cassie_out.pelvis.radio.channel[LV] = 0.;
-    if (tMujoco > 55.0)
-        cassie_out.pelvis.radio.channel[LV] = -1.;
-    if (tMujoco > 65.0)
-        cassie_out.pelvis.radio.channel[LV] = 0.;
-    if (tMujoco > 75.0)
-        cassie_out.pelvis.radio.channel[LH] = 1.;
-    if (tMujoco > 85.0)
-        cassie_out.pelvis.radio.channel[LH] = 0.;
-    if (tMujoco > 95.0)
-    {
-        cassie_out.pelvis.radio.channel[LH] = -0.50;
-        cassie_out.pelvis.radio.channel[LV] = 0.50;
+        if (tMujoco > 25.0)
+            cassie_out.pelvis.radio.channel[LV] = 1.;
+        if (tMujoco > 45.0)
+            cassie_out.pelvis.radio.channel[LV] = 0.;
+        if (tMujoco > 55.0)
+            cassie_out.pelvis.radio.channel[LV] = -1.;
+        if (tMujoco > 65.0)
+            cassie_out.pelvis.radio.channel[LV] = 0.;
+        if (tMujoco > 75.0)
+            cassie_out.pelvis.radio.channel[LH] = 1.;
+        if (tMujoco > 85.0)
+            cassie_out.pelvis.radio.channel[LH] = 0.;
+        if (tMujoco > 95.0) {
+            cassie_out.pelvis.radio.channel[LH] = -0.50;
+            cassie_out.pelvis.radio.channel[LV] = 0.50;
+        }
     }
-}
+    return;
 }
 
-void processProprioception_msg(cassie_out_t &cassie_out)
-{
+void processProprioception_msg() {
     // Pack and publish the proprioception data
     proprioception_msg.orientation.w = cassie_out.pelvis.vectorNav.orientation[0];
     proprioception_msg.orientation.x = cassie_out.pelvis.vectorNav.orientation[1];
@@ -392,4 +282,86 @@ void processProprioception_msg(cassie_out_t &cassie_out)
     proprioception_msg.encoder_velocity[11] = cassie_out.rightLeg.shinJoint.velocity;
     proprioception_msg.encoder_velocity[12] = cassie_out.rightLeg.tarsusJoint.velocity;
     proprioception_msg.encoder_velocity[13] = cassie_out.rightLeg.footJoint.velocity;
+    for (unsigned int i = 0; i < 16; i++)
+        proprioception_msg.radio[i] = cassie_out.pelvis.radio.channel[i];
+
+    return;
+}
+
+void logSimulation(fstream& logfile)
+{
+    VectorXf log = VectorXf::Zero(51);
+
+    VectorXd encoder(14), dencoder(14);
+    for (int i = 0; i < 14; i++) {
+        encoder(i) = proprioception_msg.encoder_position[i];
+        dencoder(i) = proprioception_msg.encoder_velocity[i];
+    }
+    double tsec = static_cast<double>(ros::Time::now().sec);
+    // Get the mean voltage measured on the DC bus input to the motors
+    double voltage = 0.;
+    voltage = (cassie_out.leftLeg.hipRollDrive.dcLinkVoltage + cassie_out.leftLeg.hipYawDrive.dcLinkVoltage + cassie_out.leftLeg.hipPitchDrive.dcLinkVoltage + cassie_out.leftLeg.kneeDrive.dcLinkVoltage + cassie_out.leftLeg.hipRollDrive.dcLinkVoltage + cassie_out.rightLeg.footDrive.dcLinkVoltage + cassie_out.rightLeg.hipYawDrive.dcLinkVoltage + cassie_out.rightLeg.hipPitchDrive.dcLinkVoltage + cassie_out.rightLeg.kneeDrive.dcLinkVoltage + cassie_out.rightLeg.footDrive.dcLinkVoltage) / 10.;
+
+    // Convert torques to current: current = torque / (gearRatio * motorConstant)
+    // gear ratio and motorConstant obtained from Agility Robotics
+    double motorCurrent = 0.;
+    motorCurrent = fabs(cassie_out.leftLeg.hipRollDrive.torque * 0.30769230769) + fabs(cassie_out.leftLeg.hipYawDrive.torque * 0.30769230769) + fabs(cassie_out.leftLeg.hipPitchDrive.torque * 0.23148148148) + fabs(cassie_out.leftLeg.kneeDrive.torque * 0.23148148148) + fabs(cassie_out.leftLeg.footDrive.torque * 0.35087719298) + fabs(cassie_out.rightLeg.hipRollDrive.torque * 0.30769230769) + fabs(cassie_out.rightLeg.hipYawDrive.torque * 0.30769230769) + fabs(cassie_out.rightLeg.hipPitchDrive.torque * 0.23148148148) + fabs(cassie_out.rightLeg.kneeDrive.torque * 0.23148148148) + fabs(cassie_out.rightLeg.footDrive.torque * 0.35087719298);
+
+    // Use floats for logging size and speed
+    log << static_cast<float>(tMujoco),
+        static_cast<float>(tsec), // 2                                                                                                             // 1
+        static_cast<float>(proprioception_msg.orientation.w),
+        static_cast<float>(proprioception_msg.orientation.x),
+        static_cast<float>(proprioception_msg.orientation.y),
+        static_cast<float>(proprioception_msg.orientation.z), // 4
+        static_cast<float>(proprioception_msg.angular_velocity.x),
+        static_cast<float>(proprioception_msg.angular_velocity.y),
+        static_cast<float>(proprioception_msg.angular_velocity.z), // 3
+        static_cast<float>(proprioception_msg.linear_acceleration.x),
+        static_cast<float>(proprioception_msg.linear_acceleration.y),
+        static_cast<float>(proprioception_msg.linear_acceleration.z), // 3
+        static_cast<float>(proprioception_msg.linear_velocity.x),
+        static_cast<float>(proprioception_msg.linear_velocity.y),
+        static_cast<float>(proprioception_msg.linear_velocity.z), // 3
+        encoder.cast<float>(),                                    // 14
+        dencoder.cast<float>(),                                   // 14
+        static_cast<float>(proprioception_msg.q_achilles[0]),
+        static_cast<float>(proprioception_msg.q_achilles[1]), // 2
+        static_cast<float>(proprioception_msg.dq_achilles[0]),
+        static_cast<float>(proprioception_msg.dq_achilles[1]), // 2
+        static_cast<float>(proprioception_msg.contact[0]),
+        static_cast<float>(proprioception_msg.contact[1]),
+        static_cast<float>(motorCurrent), //cassie_out.pelvis.battery.current),
+        static_cast<float>(voltage);
+
+    logfile.write(reinterpret_cast<char*>(log.data()), (log.size()) * sizeof(float));
+
+    return;
+}
+
+void CheatWithSimulationVel(cassie_sim_t* sim) {
+
+    // Use real velocity from simulation
+    Eigen::Quaterniond quat;
+    quat.w() = proprioception_msg.orientation.w;
+    quat.x() = proprioception_msg.orientation.x;
+    quat.y() = proprioception_msg.orientation.y;
+    quat.z() = proprioception_msg.orientation.z;
+    Eigen::EulerAnglesXYZd euler;
+    eulerXYZ(quat, euler);
+    Eigen::Matrix3d Rz;
+    Rz << cos(euler.gamma()), -sin(euler.gamma()), 0,
+        sin(euler.gamma()), cos(euler.gamma()), 0,
+        0, 0, 1;
+    // get the rotation matrix to the base 
+
+    double comVel[3];
+    cassie_sim_cm_velocity(sim, comVel); // this is getting COM velocity from Mujoco; TODO: just get the base velocity
+    Vector3d vel(comVel[0], comVel[1], comVel[2]);
+    vel = Rz.transpose() * vel;
+    proprioception_msg.linear_velocity.x = vel[0];
+    proprioception_msg.linear_velocity.y = vel[1];
+    proprioception_msg.linear_velocity.z = vel[2];
+
+    return;
 }
