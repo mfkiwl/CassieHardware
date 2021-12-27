@@ -1,6 +1,6 @@
 # Cassie Hardware using ROS with Mujoco + UDP communication
 
-Originally created by Jenna Reher, modified by Min Dai and Xiaobin Xiong. 
+Originally created by Jenna Reher, significantly modified by Min Dai and Xiaobin Xiong. 
 This repo is only intended for communication purposes. DO NOT USE WITHOUT INSTRUCTION. CODE UNORGANIZED 
 
 
