@@ -38,7 +38,7 @@ static VectorXd Simvel(3);
 static bool reset_ekf_needed;
 
 // Callback for estimation subscriber
-void proprioception_callback(const cassie_common_toolbox::cassie_proprioception_msg::ConstPtr &proprioceptionmsg)
+void proprioception_callback(const cassie_common_toolbox::cassie_proprioception_msg::ConstPtr& proprioceptionmsg)
 {
     timeout_timer.restart();
     robot.q.setZero();
@@ -67,7 +67,7 @@ void proprioception_callback(const cassie_common_toolbox::cassie_proprioception_
     //    ROS_INFO("got proprioception"); //update rate 2kHz
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     ros::init(argc, argv, "cassie_estimation_node");
     ros::NodeHandle nh("/cassie/estimation");
@@ -211,7 +211,7 @@ int main(int argc, char *argv[])
                     static_cast<float>(out_msg.linear_velocity.x),
                     static_cast<float>(out_msg.linear_velocity.y),
                     static_cast<float>(out_msg.linear_velocity.z); // 3
-                logfile.write(reinterpret_cast<char *>(log.data()), (log.size()) * sizeof(float));
+                logfile.write(reinterpret_cast<char*>(log.data()), (log.size()) * sizeof(float));
             }
         }
         looprate.sleep();

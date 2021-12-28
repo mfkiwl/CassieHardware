@@ -1,8 +1,6 @@
 <?xml version="1.0" ?>
 <launch>
 
-<!-- <include file="$(find cassie_interface)/launch/cassie_world.launch"/> -->
-
 <rosparam>
     use_sim_time: false
     cassie:
@@ -54,14 +52,14 @@
         locomotion_control:
             dt: 0.0005
             standing:
-                use_qp: true
-                use_lateral_comp: true
+                use_qp: true  <!-- use qp controller or ID controller  -->
+                use_lateral_comp: false
                 Kp_lateral_compensator: 3.0
                 Kd_lateral_compensator: 0.04
                 kp: '[200., 100., 300., 400., 50.]'
                 kd: '[5., 2., 6., 8., 2.]'
                 pose_command:
-                    x_com_offset: -0.01
+                    x_com_offset: 0
                     x_lowpass_dt_cutoff: 0.75
                     height_lowpass_dt_cutoff: 1.5
                     pitch_lowpass_dt_cutoff: 2.0
@@ -146,7 +144,7 @@
                     w_outputs: 10
             HLIP:
                 control_mode: 0 <!-- 0: standing, 1: walking, -1: in air -->
-                isRigid: false
+                isRigid: true
                 useHLIP: true
                 useDCBF: false
                 time_scale: 1.0
@@ -154,8 +152,8 @@
                 vy_offset: 0.00
                 stoppable_velocity_threshold: 0.2
                 useDSP:    true
-                bh:      '[0, 0,0,1, 1, 1]'
-                z0des:      .75
+                bh:      '[0, 0, 0, 1, 1, 1]'
+                z0des:    .75
                 zsw_max: 0.1
                 zsw_neg: -0.005
                 MPC_N:   5
@@ -172,7 +170,7 @@
                 HLIP_vxd: .5
                 HLIP_vyd: 0.1
                 HLIP_udes: 0
-                nom_stand_height: 0.65
+                nom_stand_height: 0.85
                 stand_radio_ratio: 0.1
 
 </rosparam>

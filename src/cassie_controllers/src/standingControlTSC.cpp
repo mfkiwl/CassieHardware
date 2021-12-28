@@ -2,7 +2,7 @@
     Min Dai, Jenna Reher
 */
 
-#include <cassie_controllers/standing_control_qp.hpp>
+#include <cassie_controllers/standingControlTSC.hpp>
 #include <cassie_common_toolbox/RadioButtonMap.hpp>
 #include <ros/ros.h>
 #include <control_utilities/limits.hpp>
@@ -13,7 +13,7 @@ using namespace cassie_model;
 using namespace control_utilities;
 USING_NAMESPACE_QPOASES
 
-void StandingControlQP::Cache::init() {
+void StandingControlTSC::Cache::init() {
     // Initialize outputs
     this->ya.resize(6);
     this->dya.resize(6);
@@ -59,7 +59,8 @@ void StandingControlQP::Cache::init() {
     this->reset();
 }
 
-void StandingControlQP::Cache::reset() {
+void StandingControlTSC::Cache::reset() {
+    this->initialHeight = 0;
     // Outputs
     this->ya.setZero();
     this->dya.setZero();
@@ -113,14 +114,14 @@ void StandingControlQP::Cache::reset() {
     this->pRF_actual.setZero();
 }
 
-void StandingControlQP::Memory::init() {
+void StandingControlTSC::Memory::init() {
     this->u_prev.resize(10);
     this->IK_solution_prev.resize(10);
     this->dyd_last.resize(6);
     this->reset();
 }
 
-void StandingControlQP::Memory::reset() {
+void StandingControlTSC::Memory::reset() {
     this->mode = -1;
     this->contact_initialized = false;
     this->readyToTransition = false;
@@ -141,7 +142,7 @@ void StandingControlQP::Memory::reset() {
     this->crouchOverrideTimer.restart();
 }
 
-void StandingControlQP::Config::init() {
+void StandingControlTSC::Config::init() {
     this->control_rate = 0.0005;
     this->height_lowpass_dt_cutoff = 100.0;
     this->lateral_lowpass_dt_cutoff = 100.0;
@@ -162,7 +163,7 @@ void StandingControlQP::Config::init() {
     this->Poffdiag.resize(6);
 }
 
-void StandingControlQP::Config::reconfigure() {
+void StandingControlTSC::Config::reconfigure() {
     this->isSim = false;
     ros::param::get("/cassie/is_simulation", this->isSim);
     this->paramChecker.checkAndUpdate("/cassie/locomotion_control/dt", this->control_rate);
@@ -283,7 +284,7 @@ void StandingControlQP::Config::reconfigure() {
     this->paramChecker.checkAndUpdateYaml("qp/kd", this->Kdy);
 }
 
-bool StandingControlQP::reconfigure() {
+bool StandingControlTSC::reconfigure() {
     std::cout << "Polling rosparams under: " << this->config.paramChecker.node.getNamespace() << std::endl;
 
     // Reconfigure high-level controller params
@@ -310,12 +311,13 @@ bool StandingControlQP::reconfigure() {
     return true;
 }
 
-bool StandingControlQP::reconfigure(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res) {
+bool StandingControlTSC::reconfigure(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res) {
     this->reconfigure();
     return true;
 }
 
-void StandingControlQP::reset() {
+/////////////////////////////////////////////////////////////////////////////
+void StandingControlTSC::reset() {
     this->cache.reset();
     this->memory.reset();
     this->heightFilter.reset();
@@ -323,7 +325,7 @@ void StandingControlQP::reset() {
     this->pitchFilter.reset();
 }
 
-StandingControlQP::StandingControlQP(ros::NodeHandle& nh, cassie_model::Cassie& robot) : nh(&nh)
+StandingControlTSC::StandingControlTSC(ros::NodeHandle& nh, cassie_model::Cassie& robot) : nh(&nh)
 {
     // Main setup
     this->robot = &robot;
@@ -349,14 +351,14 @@ StandingControlQP::StandingControlQP(ros::NodeHandle& nh, cassie_model::Cassie& 
     this->config.init();
 
     // Service for calling reconfigures
-    this->reconfigureService = nh.advertiseService("reconfigure_standing", &StandingControlQP::reconfigure, this);
+    this->reconfigureService = nh.advertiseService("reconfigure_standing", &StandingControlTSC::reconfigure, this);
     this->reconfigure();
 
     // Inverse kinematics
     this->IKfunction.init(robot);
 }
 
-void StandingControlQP::update(VectorXd& radio, VectorXd& u) {
+void StandingControlTSC::update(VectorXd& radio, VectorXd& u) {
     // Reset the transition flag
     this->memory.readyToTransition = false;
 
@@ -364,12 +366,15 @@ void StandingControlQP::update(VectorXd& radio, VectorXd& u) {
     this->robot->q.segment(BasePosX, 3) << 0., 0., 0.;
 
     // Update spooling
-    double dt = control_utilities::clamp(this->memory.timer.elapsed(), this->config.control_rate / 4, this->config.control_rate * 4);
+    double dt = this->config.control_rate;
+    //  double dt = control_utilities::clamp(this->memory.timer.elapsed(), this->config.control_rate / 4, this->config.control_rate * 4);
+
     this->memory.timer.restart();
-    this->memory.spoolup = this->memory.spoolup * (1 - 0.0020) + 1 * 0.0020;
+    this->memory.spoolup = this->memory.spoolup * (1 - 0.0020) + 1 * 0.0020; // slowly increase to 1 
 
     // Run the ID controller in the air until contact is initialized
-    if ((this->robot->leftContact >= 0.99) && (this->robot->rightContact >= 0.99))
+    cout << "contact : " << robot->leftContact << " " << robot->rightContact << endl;
+    if ((this->robot->leftContact >= 0.8) && (this->robot->rightContact >= 0.8))
         this->memory.contact_initialized = true;
 
     // Current joint configurations. Store to IK sol in case it does not converge.
@@ -396,18 +401,30 @@ void StandingControlQP::update(VectorXd& radio, VectorXd& u) {
     this->processRadio(radio);
 
     // Compute the actual and desired outputs
-    this->computeDesired(radio);
-    // this->cache.yd(0) -= 0.0068 * this->cache.yd(2) - 0.02562; // WTF: Linear fit of COM on range of motion...
+    // this->cache.yd(0) -= 0.0068 * this->cache.yd(2) - 0.02562; // WTF cheating here: Linear fit of COM on range of motion...
 
     this->computeActual();
 
-    // Compute controller
+    if (abs(this->cache.initialHeight) < 0.1)
+        this->cache.initialHeight = this->cache.ya(2);
+
+    this->computeDesired(radio);
+
+    // Comine
+    this->cache.eta << this->cache.ya - this->cache.yd, this->cache.dya - this->cache.dyd;
+    SymFunction::Dya_standCOM(this->cache.Dya, this->robot->q);
+    SymFunction::DLfya_standCOM(this->cache.DLfya, this->robot->q, this->robot->dq);
+    // SymFunction::Dya_standCOM_new(Dya, this->robot->q);
+    // SymFunction::DLfya_standCOM_new(DLfya, this->robot->q, this->robot->dq);
+
+     // Compute controller
     if (this->memory.contact_initialized && this->config.use_qp) {
         this->getTorqueQP();
     }
     else {
-        this->runInverseKinematics(this->cache.pLF_actual, this->cache.pRF_actual);
+        this->runInverseKinematics();
         this->getTorqueID();
+        cout << "use Inverse Dyn";
     }
     u = this->cache.u;
 
@@ -419,24 +436,23 @@ void StandingControlQP::update(VectorXd& radio, VectorXd& u) {
     }
 }
 
-void StandingControlQP::computeActual() {
+/////////////////////////////////////////////////////////////////////////////
+void StandingControlTSC::computeActual() {
     // Targets
     VectorXd qb(6);
     qb << this->robot->q.segment(BasePosX, 6);
     qb.segment(BasePosX, 3) = -(this->cache.pLF_actual.block(0, 0, 3, 1) + this->cache.pRF_actual.block(0, 0, 3, 1)) / 2.0;
     this->cache.ya << qb;
     this->cache.dya << this->robot->dq.segment(BasePosX, 6);
-
-    // Comine
-    this->cache.eta << this->cache.ya - this->cache.yd, this->cache.dya - this->cache.dyd;
-    SymFunction::Dya_standCOM(this->cache.Dya, this->robot->q);
-    SymFunction::DLfya_standCOM(this->cache.DLfya, this->robot->q, this->robot->dq);
 }
 
-void StandingControlQP::computeDesired(VectorXd& radio) {
+void StandingControlTSC::computeDesired(VectorXd& radio) {
     // get desired from joystick 
 
     this->cache.yd << this->config.x_com_offset, -this->lateralFilter.getValue(), -this->heightFilter.getValue(), 0., 0., 0.;
+
+    this->cache.yd(2) = this->cache.initialHeight;
+    // cout << "yd: " << this->cache.yd;
     this->cache.dyd.segment(0, 3) << -(this->cache.leftTwist.segment(0, 3) + this->cache.rightTwist.segment(0, 3)) / 2.0;
 
     // XIONG: the second order here is dangerous........
@@ -453,49 +469,328 @@ void StandingControlQP::computeDesired(VectorXd& radio) {
     // The state machine could be cleaned up... but it works fine.
     // Override the crouch with a dynamic and continuous crouch. 
     // SH default is 1; 
-    bool triggerCrouch = (-radio(SH) > 0.) && (this->heightFilter.getValue() < 0.99 * this->config.height_lb);
-    // 
-    if (triggerCrouch) std::cout << "wow you want to crouch" << std::endl;
 
-    // Check for start condition
-    if (triggerCrouch && !this->memory.crouchOverrideInitialized) {
-        this->memory.crouchOverrideCompleted = false;
-        this->memory.crouchOverrideTimer.restart();
-        this->memory.crouchOverrideInitialized = true;
-    }
-    // Check for end condition
-    if (triggerCrouch && this->memory.crouchOverrideCompleted) {
-        this->memory.crouchOverrideCompleted = false;
-        this->memory.crouchOverrideTimer.restart();
-        this->memory.crouchOverrideInitialized = false;
-    }
+        ////////////////// crouch //////////////////////////
 
-    double dt = this->memory.crouchOverrideTimer.elapsed();
-    if (this->memory.crouchOverrideInitialized) {
-        std::cout << "let's do the crouch later ok" << std::endl;
-        double zheight, zvelocity, zaccel;
-        if (dt <= 2) {
-            zheight = 0.90 - 0.4 / (1 + exp(10 - 9 * dt));
-            zvelocity = -(18 * exp(10 - 9 * dt)) / (5 * pow((exp(10 - 9 * dt) + 1), 2));
-            zaccel = (162 * exp(10 - 9 * dt)) / (5 * pow((exp(10 - 9 * dt) + 1), 2)) - (324 * exp(20 - 18 * dt)) / (5 * pow((exp(10 - 9 * dt) + 1), 3));
-        }
-        else {
-            zheight = 0.5 + 0.4 / (1 + exp(26 - 9 * dt));
-            zvelocity = (18 * exp(26 - 9 * dt)) / (5 * pow((exp(26 - 9 * dt) + 1), 2));
-            zaccel = (324 * exp(52 - 18 * dt)) / (5 * pow((exp(26 - 9 * dt) + 1), 3)) - (162 * exp(26 - 9 * dt)) / (5 * pow((exp(26 - 9 * dt) + 1), 2));
-        }
-        if (dt > 4.) {
-            this->memory.crouchOverrideCompleted = true;
-            this->memory.crouchOverrideInitialized = false;
-        }
+    // bool triggerCrouch = (-radio(SH) > 0.) && (this->heightFilter.getValue() < 0.99 * this->config.height_lb);
+    // // 
+    // if (triggerCrouch) std::cout << "wow you want to crouch" << std::endl;
 
-        this->cache.yd(2) = zheight;
-        this->cache.dyd(2) = zvelocity;
-        this->cache.d2yd(2) = zaccel;
-    }
+    // // Check for start condition
+    // if (triggerCrouch && !this->memory.crouchOverrideInitialized) {
+    //     this->memory.crouchOverrideCompleted = false;
+    //     this->memory.crouchOverrideTimer.restart();
+    //     this->memory.crouchOverrideInitialized = true;
+    // }
+    // // Check for end condition
+    // if (triggerCrouch && this->memory.crouchOverrideCompleted) {
+    //     this->memory.crouchOverrideCompleted = false;
+    //     this->memory.crouchOverrideTimer.restart();
+    //     this->memory.crouchOverrideInitialized = false;
+    // }
+
+    // double dt = this->memory.crouchOverrideTimer.elapsed();
+    // if (this->memory.crouchOverrideInitialized) {
+    //     std::cout << "let's do the crouch later ok" << std::endl;
+    //     double zheight, zvelocity, zaccel;
+    //     if (dt <= 2) {
+    //         zheight = 0.90 - 0.4 / (1 + exp(10 - 9 * dt));
+    //         zvelocity = -(18 * exp(10 - 9 * dt)) / (5 * pow((exp(10 - 9 * dt) + 1), 2));
+    //         zaccel = (162 * exp(10 - 9 * dt)) / (5 * pow((exp(10 - 9 * dt) + 1), 2)) - (324 * exp(20 - 18 * dt)) / (5 * pow((exp(10 - 9 * dt) + 1), 3));
+    //     }
+    //     else {
+    //         zheight = 0.5 + 0.4 / (1 + exp(26 - 9 * dt));
+    //         zvelocity = (18 * exp(26 - 9 * dt)) / (5 * pow((exp(26 - 9 * dt) + 1), 2));
+    //         zaccel = (324 * exp(52 - 18 * dt)) / (5 * pow((exp(26 - 9 * dt) + 1), 3)) - (162 * exp(26 - 9 * dt)) / (5 * pow((exp(26 - 9 * dt) + 1), 2));
+    //     }
+    //     if (dt > 4.) {
+    //         this->memory.crouchOverrideCompleted = true;
+    //         this->memory.crouchOverrideInitialized = false;
+    //     }
+
+    //     this->cache.yd(2) = zheight;
+    //     this->cache.dyd(2) = zvelocity;
+    //     this->cache.d2yd(2) = zaccel;
+    // }
 }
 
-void StandingControlQP::getTorqueQP() {
+void StandingControlTSC::processRadio(VectorXd& radio) {
+    // TODO: Clean up these shit here !!!!
+    // Stored values
+    double last_left_x = this->leftXFilter.getValue();
+    double last_right_x = this->rightXFilter.getValue();
+    double last_lateral = this->lateralFilter.getValue();
+    double last_left_height = this->heightFilter.getValue();
+    double last_right_height = this->heightFilter.getValue();
+    double last_pitch = this->pitchFilter.getValue();
+
+    // Check for transition request
+    if (!this->memory.queueTransition && (radio(SB) > 0.1)) {
+        // Radio was moved up, queue the transition
+        ROS_INFO("Requested a transition to walking!");
+        this->memory.queueTransition = true;
+    }
+    // If we have a queue stored, overwrite the radio commands to do the desired motion to walking
+    if (this->memory.queueTransition) {
+        // Spoof the radio commands
+        // why!!!!!!!!!!!!!!!!!!!
+        radio(RV) = 0.0;
+        radio(LS) = 1.0;
+        radio(RH) = 1.0;
+        cout << "be cauious: check later" << endl;
+    }
+
+    // X
+    double x_width = this->memory.T_leftContact.translation()[0] - this->memory.T_rightContact.translation()[0];
+    double x_desired = 0;
+    if (x_width > 0) {
+        // left foot forward
+        this->leftXFilter.update(x_desired - x_width / 2.0);
+        this->rightXFilter.update(x_desired + x_width / 2.0);
+    }
+    else {
+        // right foot forward
+        this->leftXFilter.update(x_desired + x_width / 2.0);
+        this->rightXFilter.update(x_desired - x_width / 2.0);
+    }
+    this->cache.leftTwist(0) = (this->leftXFilter.getValue() - last_left_x) / this->config.control_rate;
+    this->cache.rightTwist(0) = (this->rightXFilter.getValue() - last_right_x) / this->config.control_rate;
+
+    // Y
+    double lateral_width = this->memory.T_leftContact.translation()[1] - this->memory.T_rightContact.translation()[1];
+    double latRange_lb = this->config.lateral_lb * lateral_width / 2.0; // % of the recorded width
+    double latRange_ub = this->config.lateral_ub * lateral_width / 2.0;
+    double latDesiredRaw = radio(RadioButtonMap::LH);
+    latDesiredRaw = lateral_width * latDesiredRaw * (latRange_ub - latRange_lb) / 2.0;
+
+    this->lateralFilter.update((latDesiredRaw + lateral_width) / 2.0);
+    this->lateralFilter.update((latDesiredRaw - lateral_width) / 2.0);
+
+    double leftLateralDesired = this->lateralFilter.getValue();
+    double rightLateralDesired = this->lateralFilter.getValue();
+    this->cache.leftTwist(1) = (leftLateralDesired - last_lateral) / this->config.control_rate;
+    this->cache.rightTwist(1) = (rightLateralDesired - last_lateral) / this->config.control_rate;
+
+    // Z
+    double hRange_lb = this->config.height_lb;
+    double hRange_ub = this->config.height_ub;
+    double zDesiredRaw = (1.0 + radio(RadioButtonMap::LS)) / 2.0;
+    zDesiredRaw = hRange_ub - zDesiredRaw * (hRange_ub - hRange_lb);
+    this->heightFilter.update(zDesiredRaw);
+    this->heightFilter.update(zDesiredRaw);
+
+    this->cache.leftTwist(2) = (this->heightFilter.getValue() - last_left_height) / this->config.control_rate;
+    this->cache.rightTwist(2) = (this->heightFilter.getValue() - last_right_height) / this->config.control_rate;
+
+    // Pitch
+    double pRange_lb = this->config.pitch_lb;
+    double pRange_ub = this->config.pitch_ub;
+    double pDesiredRaw = radio(RadioButtonMap::RV);
+    pDesiredRaw = pDesiredRaw * (pRange_ub - pRange_lb) / 2.0;
+    this->pitchFilter.update(pDesiredRaw);
+
+    this->cache.pitch_desired = this->pitchFilter.getValue();
+    this->cache.leftTwist(3) = (this->cache.pitch_desired - last_pitch) / this->config.control_rate;
+    this->cache.rightTwist(3) = (this->cache.pitch_desired - last_pitch) / this->config.control_rate;
+
+    // Use the pitch rate to update the twist for the leg cartesian velocitites
+    //Vector3d w(0.0, this->cache.leftTwist(3), 0.0);
+    //this->cache.leftTwist.block(0,0,3,1) = skew(w) * this->cache.leftTwist.block(0,0,3,1);
+    //this->cache.rightTwist.block(0,0,3,1) = skew(w) * this->cache.rightTwist.block(0,0,3,1);
+
+    /*
+    // Turn off chatter?
+    for (int i=0; i<4; ++i) {
+        if (fabs(this->cache.leftTwist(i)) < 0.05)
+            this->cache.leftTwist(i) = 0;
+        if (fabs(this->cache.rightTwist(i)) < 0.05)
+            this->cache.rightTwist(i) = 0;
+    }
+    */
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+
+void StandingControlTSC::setFootTransforms() {
+    // Set the current foot transforms based on the robot state
+    VectorXd q(22);
+    q << this->robot->q;
+    q.segment(BasePosX, 6) << 0, 0, 0, 0, 0, 0;
+    q(LeftShinPitch) = 0.0;
+    q(LeftTarsusPitch) = 0.226893 - q(LeftKneePitch); // 13 deg - knee
+    q(RightShinPitch) = 0.0;
+    q(RightTarsusPitch) = 0.226893 - q(RightKneePitch);
+
+    MatrixXd p_leftFoot(5, 1), p_rightFoot(5, 1);
+    SymFunction::p_leftSole_constraint(p_leftFoot, q);
+    SymFunction::p_rightSole_constraint(p_rightFoot, q);
+
+    this->memory.T_leftContact.translation() = p_leftFoot.block(0, 0, 3, 1);
+    this->memory.T_rightContact.translation() = p_rightFoot.block(0, 0, 3, 1);
+
+    // Set filters for X
+    this->leftXFilter.update(p_leftFoot(0));
+    this->rightXFilter.update(p_rightFoot(0));
+
+    // Lateral filter
+    this->lateralFilter.update((p_leftFoot(1) + p_rightFoot(1)) / 2.0);
+
+    // Set the desired heights
+    this->heightFilter.update(p_leftFoot(2));
+    this->heightFilter.update(p_rightFoot(2));
+
+    // Pitch filter
+    this->pitchFilter.update(q(BaseRotY));
+
+    std::cout << "LeftContact registered at: \n\t" << this->memory.T_leftContact.translation().transpose() << std::endl;
+    std::cout << "RightContact registered at: \n\t" << this->memory.T_rightContact.translation().transpose() << std::endl;
+}
+
+int StandingControlTSC::InverseKinematics(VectorXd& x) {
+
+    int iteration_limit = this->config.ik_iter_limit;
+    double xtol = this->config.ik_xtol;
+    VectorXd q(22);
+    q << robot->q;
+    for (int i = 0; i < 6; ++i)
+        q(i) = 0.0;
+    q(LeftShinPitch) = 0.0;
+    q(RightShinPitch) = 0.0;
+
+    VectorXd F(10);
+    MatrixXd J(10, 10);
+    double f_d = 0.0;
+
+    for (int i = 0; i < iteration_limit; ++i) {
+        // Reinitialize the state at the current guess
+        this->IKfunction(x, F);
+
+        // Check for completion
+        f_d = 0.5 * F.transpose() * F;
+        if (f_d < xtol) {
+            return i;
+        }
+
+        // Compute the Jacobian
+        this->IKfunction.df(x, J);
+
+        // Perform the update
+        x = x - (J.transpose() * (J * J.transpose()).inverse()) * F;
+    }
+    ROS_WARN("IK DID NOT CONVERGE");
+    return -1;
+}
+
+void StandingControlTSC::getTorqueID() {
+    VectorXd u(10);
+    VectorXd q_motors(10), dq_motors(10);
+    for (int i = 0; i < this->robot->iRotorMap.size(); ++i) {
+        int ind = this->robot->iRotorMap(i);
+        q_motors(i) = this->robot->q(ind);
+        dq_motors(i) = this->robot->dq(ind);
+    }
+
+    // Compute torques via PD
+    u = this->pd.compute(this->cache.IK_solution, this->cache.dq_desired, q_motors, dq_motors);
+
+    if (this->memory.contact_initialized) {
+        // Feedforward from Inverse Dynamics
+        this->robot->dynamics.calcHandC(this->robot->model, this->robot->q, this->robot->dq);
+        MatrixXd B(22, 10);
+        B.setZero();
+        B(LeftHipRoll, 0) = 1.;
+        B(LeftHipYaw, 1) = 1.;
+        B(LeftHipPitch, 2) = 1.;
+        B(LeftKneePitch, 3) = 1.;
+        B(LeftFootPitch, 4) = 1.;
+        B(RightHipRoll, 5) = 1.;
+        B(RightHipYaw, 6) = 1.;
+        B(RightHipPitch, 7) = 1.;
+        B(RightKneePitch, 8) = 1.;
+        B(RightFootPitch, 9) = 1.;
+
+        // Compute the robot constraints
+        MatrixXd Jc(14, 22);
+        this->robot->kinematics.update(this->robot->model, this->robot->q, this->robot->q);
+        Jc << this->robot->kinematics.cache.J_achilles,
+            this->robot->kinematics.cache.J_rigid,
+            this->robot->kinematics.cache.J_poseLeftConstraint.block(0, 0, 4, 22), // Leave out foot yaw
+            this->robot->kinematics.cache.J_poseRightConstraint.block(0, 0, 4, 22);
+
+        MatrixXd Ge(22, 1); Ge.setZero();
+        SymFunction::Ge_cassie_v4(Ge, this->robot->q);
+
+        MatrixXd P(22, 22);
+        P = MatrixXd::Identity(22, 22) - Jc.completeOrthogonalDecomposition().solve(Jc);
+
+        VectorXd ff(10);
+        MatrixXd PB(22, 10);
+        PB = P * B;
+        //ff = PB.completeOrthogonalDecomposition().solve(P) * Ge;
+        ff = PB.completeOrthogonalDecomposition().solve(P) * this->robot->dynamics.C;
+        u += ff;
+
+        // Add a naiive toe regulator...
+        u(4) -= 45. * (this->robot->q(BaseRotY) - this->cache.pitch_desired) + 2. * this->robot->dq(BaseRotY);
+        u(9) -= 45. * (this->robot->q(BaseRotY) - this->cache.pitch_desired) + 2. * this->robot->dq(BaseRotY);
+    }
+    this->cache.u = u;
+}
+
+void StandingControlTSC::runInverseKinematics() {
+    // Get desired pelvis position
+    double pdes = this->pitchFilter.getValue();
+    Matrix3d Rot;
+    Rot << cos(pdes), 0, sin(pdes),
+        0, 1, 0,
+        -sin(pdes), 0, cos(pdes);
+    this->cache.T_des_pelvis.matrix().block(0, 0, 3, 3) << Rot;
+
+    VectorXd footDiff(3);
+    footDiff = this->memory.T_leftContact.translation() - this->memory.T_rightContact.translation();
+
+    // X position
+    this->cache.T_des_leftFoot(0, 3) = -footDiff(0) - this->cache.yd(0);
+    this->cache.T_des_rightFoot(0, 3) = footDiff(0) - this->cache.yd(0);
+
+    // Y position
+    this->cache.T_des_leftFoot(1, 3) = footDiff(1) / 2. - this->cache.yd(1);
+    this->cache.T_des_rightFoot(1, 3) = -footDiff(1) / 2. - this->cache.yd(1);
+
+    // Z position
+    double roll = this->robot->q(3);
+    double droll = this->robot->dq(3);
+    double lateralStabilizer = 0.0;
+    if (this->config.use_lateral_comp)
+        lateralStabilizer = this->memory.spoolup * (this->config.Kp_lateral_compensator * roll + this->config.Kd_lateral_compensator * droll);
+    this->cache.T_des_leftFoot(2, 3) = -this->cache.yd(2) + lateralStabilizer / 2.0;
+    this->cache.T_des_rightFoot(2, 3) = -this->cache.yd(2) - lateralStabilizer / 2.0;
+
+    // Set residual function target
+    double footpitch_target = 0.0;
+    this->IKfunction.setTarget(this->cache.T_des_pelvis,
+        this->cache.T_des_leftFoot, footpitch_target,
+        this->cache.T_des_rightFoot, footpitch_target);
+
+    // Solve the IK problem - uses current state as the initial guess
+    int iksuccess = this->InverseKinematics(this->cache.IK_solution);
+    if (iksuccess < 0) {
+        // Don't use solution if it failed ...
+        // Just do what the last command was
+        this->cache.IK_solution << this->memory.IK_solution_prev;
+    }
+
+    // Compute the desired velocities
+    this->cache.target_velocities << this->cache.dyd.segment(0, 3), 0.0, -this->cache.dyd(4),
+        this->cache.dyd.segment(0, 3), 0.0, -this->cache.dyd(4);
+
+    this->IKfunction.df(this->cache.IK_solution, this->cache.Jik);
+    this->cache.dq_desired = this->cache.Jik.inverse() * this->cache.target_velocities;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+void StandingControlTSC::getTorqueQP() {
     // Zero torque
     VectorXd u = VectorXd::Zero(10);
 
@@ -697,7 +992,9 @@ void StandingControlQP::getTorqueQP() {
     this->qpsolver->getPrimalSolution(static_cast<real_t*>(this->cache.qpsol.data()));
     if (success != SUCCESSFUL_RETURN) {
         ROS_WARN("THE QP DID NOT CONVERGE!");
-        this->runInverseKinematics(this->cache.pLF_actual, this->cache.pRF_actual);
+        cout << "QP failed!" << endl;
+        // TODO: safe action 
+        this->runInverseKinematics();
         this->getTorqueID();
         this->qpsolver->reset();
         this->memory.qp_initialized = false;
@@ -712,281 +1009,10 @@ void StandingControlQP::getTorqueQP() {
 
 }
 
-void StandingControlQP::setFootTransforms() {
-    // Set the current foot transforms based on the robot state
-    VectorXd q(22);
-    q << this->robot->q;
-    q.segment(BasePosX, 6) << 0, 0, 0, 0, 0, 0;
-    q(LeftShinPitch) = 0.0;
-    q(LeftTarsusPitch) = 0.226893 - q(LeftKneePitch); // 13 deg - knee
-    q(RightShinPitch) = 0.0;
-    q(RightTarsusPitch) = 0.226893 - q(RightKneePitch);
-
-    MatrixXd p_leftFoot(5, 1), p_rightFoot(5, 1);
-    SymFunction::p_leftSole_constraint(p_leftFoot, q);
-    SymFunction::p_rightSole_constraint(p_rightFoot, q);
-
-    this->memory.T_leftContact.translation() = p_leftFoot.block(0, 0, 3, 1);
-    this->memory.T_rightContact.translation() = p_rightFoot.block(0, 0, 3, 1);
-
-    // Set filters for X
-    this->leftXFilter.update(p_leftFoot(0));
-    this->rightXFilter.update(p_rightFoot(0));
-
-    // Lateral filter
-    this->lateralFilter.update((p_leftFoot(1) + p_rightFoot(1)) / 2.0);
-
-    // Set the desired heights
-    this->heightFilter.update(p_leftFoot(2));
-    this->heightFilter.update(p_rightFoot(2));
-
-    // Pitch filter
-    this->pitchFilter.update(q(BaseRotY));
-
-    std::cout << "LeftContact registered at: \n\t" << this->memory.T_leftContact.translation().transpose() << std::endl;
-    std::cout << "RightContact registered at: \n\t" << this->memory.T_rightContact.translation().transpose() << std::endl;
-}
-
-void StandingControlQP::processRadio(VectorXd& radio) {
-    // TODO: Clean up these shit here !!!!
-    // Stored values
-    double last_left_x = this->leftXFilter.getValue();
-    double last_right_x = this->rightXFilter.getValue();
-    double last_lateral = this->lateralFilter.getValue();
-    double last_left_height = this->heightFilter.getValue();
-    double last_right_height = this->heightFilter.getValue();
-    double last_pitch = this->pitchFilter.getValue();
-
-    // Check for transition request
-    if (!this->memory.queueTransition && (radio(SB) > 0.1)) {
-        // Radio was moved up, queue the transition
-        ROS_INFO("Requested a transition to walking!");
-        this->memory.queueTransition = true;
-    }
-    // If we have a queue stored, overwrite the radio commands to do the desired motion to walking
-    if (this->memory.queueTransition) {
-        // Spoof the radio commands
-        // why!!!!!!!!!!!!!!!!!!!
-        radio(RV) = 0.0;
-        radio(LS) = 1.0;
-        radio(RH) = 1.0;
-        cout << "be cauious: check later" << endl;
-    }
-
-    // X
-    double x_width = this->memory.T_leftContact.translation()[0] - this->memory.T_rightContact.translation()[0];
-    double x_desired = 0;
-    if (x_width > 0) {
-        // left foot forward
-        this->leftXFilter.update(x_desired - x_width / 2.0);
-        this->rightXFilter.update(x_desired + x_width / 2.0);
-    }
-    else {
-        // right foot forward
-        this->leftXFilter.update(x_desired + x_width / 2.0);
-        this->rightXFilter.update(x_desired - x_width / 2.0);
-    }
-    this->cache.leftTwist(0) = (this->leftXFilter.getValue() - last_left_x) / this->config.control_rate;
-    this->cache.rightTwist(0) = (this->rightXFilter.getValue() - last_right_x) / this->config.control_rate;
-
-    // Y
-    double lateral_width = this->memory.T_leftContact.translation()[1] - this->memory.T_rightContact.translation()[1];
-    double latRange_lb = this->config.lateral_lb * lateral_width / 2.0; // % of the recorded width
-    double latRange_ub = this->config.lateral_ub * lateral_width / 2.0;
-    double latDesiredRaw = radio(RadioButtonMap::LH);
-    latDesiredRaw = lateral_width * latDesiredRaw * (latRange_ub - latRange_lb) / 2.0;
-
-    this->lateralFilter.update((latDesiredRaw + lateral_width) / 2.0);
-    this->lateralFilter.update((latDesiredRaw - lateral_width) / 2.0);
-
-    double leftLateralDesired = this->lateralFilter.getValue();
-    double rightLateralDesired = this->lateralFilter.getValue();
-    this->cache.leftTwist(1) = (leftLateralDesired - last_lateral) / this->config.control_rate;
-    this->cache.rightTwist(1) = (rightLateralDesired - last_lateral) / this->config.control_rate;
-
-    // Z
-    double hRange_lb = this->config.height_lb;
-    double hRange_ub = this->config.height_ub;
-    double zDesiredRaw = (1.0 + radio(RadioButtonMap::LS)) / 2.0;
-    zDesiredRaw = hRange_ub - zDesiredRaw * (hRange_ub - hRange_lb);
-    this->heightFilter.update(zDesiredRaw);
-    this->heightFilter.update(zDesiredRaw);
-
-    this->cache.leftTwist(2) = (this->heightFilter.getValue() - last_left_height) / this->config.control_rate;
-    this->cache.rightTwist(2) = (this->heightFilter.getValue() - last_right_height) / this->config.control_rate;
-
-    // Pitch
-    double pRange_lb = this->config.pitch_lb;
-    double pRange_ub = this->config.pitch_ub;
-    double pDesiredRaw = radio(RadioButtonMap::RV);
-    pDesiredRaw = pDesiredRaw * (pRange_ub - pRange_lb) / 2.0;
-    this->pitchFilter.update(pDesiredRaw);
-
-    this->cache.pitch_desired = this->pitchFilter.getValue();
-    this->cache.leftTwist(3) = (this->cache.pitch_desired - last_pitch) / this->config.control_rate;
-    this->cache.rightTwist(3) = (this->cache.pitch_desired - last_pitch) / this->config.control_rate;
-
-    // Use the pitch rate to update the twist for the leg cartesian velocitites
-    //Vector3d w(0.0, this->cache.leftTwist(3), 0.0);
-    //this->cache.leftTwist.block(0,0,3,1) = skew(w) * this->cache.leftTwist.block(0,0,3,1);
-    //this->cache.rightTwist.block(0,0,3,1) = skew(w) * this->cache.rightTwist.block(0,0,3,1);
-
-    /*
-    // Turn off chatter?
-    for (int i=0; i<4; ++i) {
-        if (fabs(this->cache.leftTwist(i)) < 0.05)
-            this->cache.leftTwist(i) = 0;
-        if (fabs(this->cache.rightTwist(i)) < 0.05)
-            this->cache.rightTwist(i) = 0;
-    }
-    */
-}
 
 
-int StandingControlQP::InverseKinematics(VectorXd& x) {
-
-    int iteration_limit = this->config.ik_iter_limit;
-    double xtol = this->config.ik_xtol;
-    VectorXd q(22);
-    q << robot->q;
-    for (int i = 0; i < 6; ++i)
-        q(i) = 0.0;
-    q(LeftShinPitch) = 0.0;
-    q(RightShinPitch) = 0.0;
-
-    VectorXd F(10);
-    MatrixXd J(10, 10);
-    double f_d = 0.0;
-
-    for (int i = 0; i < iteration_limit; ++i) {
-        // Reinitialize the state at the current guess
-        this->IKfunction(x, F);
-
-        // Check for completion
-        f_d = 0.5 * F.transpose() * F;
-        if (f_d < xtol) {
-            return i;
-        }
-
-        // Compute the Jacobian
-        this->IKfunction.df(x, J);
-
-        // Perform the update
-        x = x - (J.transpose() * (J * J.transpose()).inverse()) * F;
-    }
-    ROS_WARN("IK DID NOT CONVERGE");
-    return -1;
-}
-
-void StandingControlQP::getTorqueID() {
-    VectorXd u(10);
-    VectorXd q_motors(10), dq_motors(10);
-    for (int i = 0; i < this->robot->iRotorMap.size(); ++i) {
-        int ind = this->robot->iRotorMap(i);
-        q_motors(i) = this->robot->q(ind);
-        dq_motors(i) = this->robot->dq(ind);
-    }
-
-    // Compute torques via PD
-    u = this->pd.compute(this->cache.IK_solution, this->cache.dq_desired, q_motors, dq_motors);
-
-    if (this->memory.contact_initialized) {
-        // Feedforward from Inverse Dynamics
-        this->robot->dynamics.calcHandC(this->robot->model, this->robot->q, this->robot->dq);
-        MatrixXd B(22, 10);
-        B.setZero();
-        B(LeftHipRoll, 0) = 1.;
-        B(LeftHipYaw, 1) = 1.;
-        B(LeftHipPitch, 2) = 1.;
-        B(LeftKneePitch, 3) = 1.;
-        B(LeftFootPitch, 4) = 1.;
-        B(RightHipRoll, 5) = 1.;
-        B(RightHipYaw, 6) = 1.;
-        B(RightHipPitch, 7) = 1.;
-        B(RightKneePitch, 8) = 1.;
-        B(RightFootPitch, 9) = 1.;
-
-        // Compute the robot constraints
-        MatrixXd Jc(14, 22);
-        this->robot->kinematics.update(this->robot->model, this->robot->q, this->robot->q);
-        Jc << this->robot->kinematics.cache.J_achilles,
-            this->robot->kinematics.cache.J_rigid,
-            this->robot->kinematics.cache.J_poseLeftConstraint.block(0, 0, 4, 22), // Leave out foot yaw
-            this->robot->kinematics.cache.J_poseRightConstraint.block(0, 0, 4, 22);
-
-        MatrixXd Ge(22, 1); Ge.setZero();
-        SymFunction::Ge_cassie_v4(Ge, this->robot->q);
-
-        MatrixXd P(22, 22);
-        P = MatrixXd::Identity(22, 22) - Jc.completeOrthogonalDecomposition().solve(Jc);
-
-        VectorXd ff(10);
-        MatrixXd PB(22, 10);
-        PB = P * B;
-        //ff = PB.completeOrthogonalDecomposition().solve(P) * Ge;
-        ff = PB.completeOrthogonalDecomposition().solve(P) * this->robot->dynamics.C;
-        u += ff;
-
-        // Add a naiive toe regulator...
-        u(4) -= 45. * (this->robot->q(BaseRotY) - this->cache.pitch_desired) + 2. * this->robot->dq(BaseRotY);
-        u(9) -= 45. * (this->robot->q(BaseRotY) - this->cache.pitch_desired) + 2. * this->robot->dq(BaseRotY);
-    }
-    this->cache.u = u;
-}
-
-void StandingControlQP::runInverseKinematics(MatrixXd& pLF, MatrixXd& pRF) {
-    // Get desired pelvis position
-    double pdes = this->pitchFilter.getValue();
-    Matrix3d Rot;
-    Rot << cos(pdes), 0, sin(pdes),
-        0, 1, 0,
-        -sin(pdes), 0, cos(pdes);
-    this->cache.T_des_pelvis.matrix().block(0, 0, 3, 3) << Rot;
-
-    VectorXd footDiff(3);
-    footDiff = this->memory.T_leftContact.translation() - this->memory.T_rightContact.translation();
-
-    // X position
-    this->cache.T_des_leftFoot(0, 3) = -footDiff(0) - this->cache.yd(0);
-    this->cache.T_des_rightFoot(0, 3) = footDiff(0) - this->cache.yd(0);
-
-    // Y position
-    this->cache.T_des_leftFoot(1, 3) = footDiff(1) / 2. - this->cache.yd(1);
-    this->cache.T_des_rightFoot(1, 3) = -footDiff(1) / 2. - this->cache.yd(1);
-
-    // Z position
-    double roll = this->robot->q(3);
-    double droll = this->robot->dq(3);
-    double lateralStabilizer = 0.0;
-    if (this->config.use_lateral_comp)
-        lateralStabilizer = this->memory.spoolup * (this->config.Kp_lateral_compensator * roll + this->config.Kd_lateral_compensator * droll);
-    this->cache.T_des_leftFoot(2, 3) = -this->cache.yd(2) + lateralStabilizer / 2.0;
-    this->cache.T_des_rightFoot(2, 3) = -this->cache.yd(2) - lateralStabilizer / 2.0;
-
-    // Set residual function target
-    double footpitch_target = 0.0;
-    this->IKfunction.setTarget(this->cache.T_des_pelvis,
-        this->cache.T_des_leftFoot, footpitch_target,
-        this->cache.T_des_rightFoot, footpitch_target);
-
-    // Solve the IK problem - uses current state as the initial guess
-    int iksuccess = this->InverseKinematics(this->cache.IK_solution);
-    if (iksuccess < 0) {
-        // Don't use solution if it failed ...
-        // Just do what the last command was
-        this->cache.IK_solution << this->memory.IK_solution_prev;
-    }
-
-    // Compute the desired velocities
-    this->cache.target_velocities << this->cache.dyd.segment(0, 3), 0.0, -this->cache.dyd(4),
-        this->cache.dyd.segment(0, 3), 0.0, -this->cache.dyd(4);
-
-    this->IKfunction.df(this->cache.IK_solution, this->cache.Jik);
-    this->cache.dq_desired = this->cache.Jik.inverse() * this->cache.target_velocities;
-}
-
-
-void StandingControlQP::getLog(VectorXf& log) {
+//////////////////////////////////////////////////////////////////////////////
+void StandingControlTSC::getLog(VectorXf& log) {
     double tsec = static_cast<double>(ros::Time::now().sec);
     double tnsec = 1e-9 * static_cast<double>(ros::Time::now().nsec);
     // Move zero to closer time rather than 1970 so it fits in a float

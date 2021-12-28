@@ -1,11 +1,12 @@
- 
+
 #include <cassie_estimation/contact_classifier.hpp>
 #include <control_utilities/limits.hpp>
 
 using namespace cassie_model;
+using namespace std;
 
-ContactClassifier::ContactClassifier(ros::NodeHandle &nh, cassie_model::Cassie &robot, double dt)
-    : LowPassLeft(dt, 1/300), LowPassRight(dt, 1/300)
+ContactClassifier::ContactClassifier(ros::NodeHandle& nh, cassie_model::Cassie& robot, double dt)
+    : LowPassLeft(dt, 1 / 300), LowPassRight(dt, 1 / 300)
 {
     this->config.paramChecker.init(nh.getNamespace() + "/contact_classifier");
 
@@ -22,7 +23,7 @@ ContactClassifier::ContactClassifier(ros::NodeHandle &nh, cassie_model::Cassie &
 }
 
 double sigmoid(double s, double A, double B, double power) {
-    return 1.0 / ( 1.0 + exp(-A * pow((s - B),power)) );
+    return 1.0 / (1.0 + exp(-A * pow((s - B), power)));
 }
 
 void ContactClassifier::Config::init() {
@@ -30,7 +31,7 @@ void ContactClassifier::Config::init() {
     this->sigmoid_B = 30;
     this->sigmoid_power = 1;
     this->dt = 0.0005;
-    this->lowpass_dt_cutoff = 1/300.;
+    this->lowpass_dt_cutoff = 1 / 300.;
 }
 
 void ContactClassifier::Config::reconfigure() {
@@ -52,40 +53,41 @@ void ContactClassifier::reconfigure() {
     this->LowPassRight.reconfigure(this->config.dt, this->config.lowpass_dt_cutoff);
 }
 
-bool ContactClassifier::reconfigure(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res) {
+bool ContactClassifier::reconfigure(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res) {
     this->reconfigure();
     return true;
 }
 
+///////////// TODO: separate into two versions RIGID and COMPLIANT/////////////////////
 void ContactClassifier::update() {
-    MatrixXd Jl(3,7), Jr(3,7), JrigidLeft(3,5), JrigidRight(3,5);
+    MatrixXd Jl(3, 7), Jr(3, 7), JrigidLeft(3, 5), JrigidRight(3, 5);
 
     this->robot->kinematics.computeConstrainedToeJacobian(this->robot->q, Jl, Jr);
 
     JrigidLeft.setZero();
     JrigidRight.setZero();
 
-    JrigidLeft.block(0,0,3,4) << Jl.block(0, 0, 3, 4);
-    JrigidLeft.block(0,4,3,1) << Jl.block(0,6,3,1);
-    JrigidRight.block(0,0,3,4) << Jr.block(0, 0, 3, 4);
-    JrigidRight.block(0,4,3,1) << Jr.block(0,6,3,1);
+    JrigidLeft.block(0, 0, 3, 4) << Jl.block(0, 0, 3, 4);
+    JrigidLeft.block(0, 4, 3, 1) << Jl.block(0, 6, 3, 1);
+    JrigidRight.block(0, 0, 3, 4) << Jr.block(0, 0, 3, 4);
+    JrigidRight.block(0, 4, 3, 1) << Jr.block(0, 6, 3, 1);
 
     // Compute the quasi-static grf estimate in robot body frame
-    this->grf.segment(0,3) = - (JrigidLeft.transpose()).completeOrthogonalDecomposition().solve(this->robot->torque.segment(0,5));
-    this->grf.segment(3,3) = - (JrigidRight.transpose()).completeOrthogonalDecomposition().solve(this->robot->torque.segment(5,5));
+    this->grf.segment(0, 3) = -(JrigidLeft.transpose()).completeOrthogonalDecomposition().solve(this->robot->torque.segment(0, 5));
+    this->grf.segment(3, 3) = -(JrigidRight.transpose()).completeOrthogonalDecomposition().solve(this->robot->torque.segment(5, 5));
 
     // Rotate into the world
     Eigen::Matrix3d Rx, Ry, R;
-    Rx << 1.,0.,0.,
-    0., cos(this->robot->q(BaseRotX)), -sin(this->robot->q(BaseRotX)),
-    0., sin(this->robot->q(BaseRotX)), cos(this->robot->q(BaseRotX));
+    Rx << 1., 0., 0.,
+        0., cos(this->robot->q(BaseRotX)), -sin(this->robot->q(BaseRotX)),
+        0., sin(this->robot->q(BaseRotX)), cos(this->robot->q(BaseRotX));
     Ry << cos(this->robot->q(BaseRotY)), 0, sin(this->robot->q(BaseRotY)),
-    0.,1.,0.,
-    -sin(this->robot->q(BaseRotY)), 0, cos(this->robot->q(BaseRotY));
+        0., 1., 0.,
+        -sin(this->robot->q(BaseRotY)), 0, cos(this->robot->q(BaseRotY));
     R << Ry * Rx;
 
-    grf.segment(0,3) = R * grf.segment(0,3);
-    grf.segment(3,3) = R * grf.segment(3,3);
+    grf.segment(0, 3) = R * grf.segment(0, 3);
+    grf.segment(3, 3) = R * grf.segment(3, 3);
 
     // Update vertical grf lowpass
     this->LowPassLeft.update(this->grf(2));
@@ -93,9 +95,10 @@ void ContactClassifier::update() {
 
     if (this->config.use_sigmoid) {
         // Sigmoid classifier
-        this->robot->leftContact  = sigmoid(this->LowPassLeft.getValue(), this->config.sigmoid_A, this->config.sigmoid_B, this->config.sigmoid_power);
+        this->robot->leftContact = sigmoid(this->LowPassLeft.getValue(), this->config.sigmoid_A, this->config.sigmoid_B, this->config.sigmoid_power);
         this->robot->rightContact = sigmoid(this->LowPassRight.getValue(), this->config.sigmoid_A, this->config.sigmoid_B, this->config.sigmoid_power);
-    } else {
+    }
+    else {
         // Linear classifier
         this->robot->leftContact = control_utilities::clamp((this->LowPassLeft.getValue() - this->config.linear_lb) / (this->config.linear_ub - this->config.linear_lb), 0, 1);
         this->robot->rightContact = control_utilities::clamp((this->LowPassRight.getValue() - this->config.linear_lb) / (this->config.linear_ub - this->config.linear_lb), 0, 1);

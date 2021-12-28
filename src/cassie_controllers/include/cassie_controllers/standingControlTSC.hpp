@@ -1,9 +1,9 @@
 /**
-    Min Dai, Jenna Reher
+    Xiong, Min Dai, Jenna Reher
 */
 
-#ifndef STANDING_CONTROL_QP_HPP
-#define STANDING_CONTROL_QP_HPP
+#ifndef STANDING_CONTROL_TSC_HPP
+#define STANDING_CONTROL_TSC_HPP
 
 #include <cassie_description/cassie_model.hpp>
 #include <control_utilities/filters.hpp>
@@ -21,10 +21,10 @@
 
 USING_NAMESPACE_QPOASES
 
-class StandingControlQP {
+class StandingControlTSC {
 
 public:
-    StandingControlQP(ros::NodeHandle& nh, cassie_model::Cassie& robot);
+    StandingControlTSC(ros::NodeHandle& nh, cassie_model::Cassie& robot);
     void update(Eigen::VectorXd& radio, Eigen::VectorXd& u);
     void reset();
     bool reconfigure();
@@ -37,6 +37,8 @@ private:
     * Meant to only be valid during one computation frame. Anything meant to persist across time should be stored in Memory.
     */
     struct Cache {
+
+        double initialHeight = 0;
         // Input
         VectorXd u;
         VectorXd qmd;
@@ -227,7 +229,7 @@ private:
     bool reconfigure(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
 
     // Various control methods
-    void runInverseKinematics(MatrixXd& pLF, MatrixXd& pRF);
+    void runInverseKinematics();
     void getTorqueQP();
     void getTorqueID();
     void computeDesired(VectorXd& radio);

@@ -1,6 +1,7 @@
 /*
- to do: replace gazebo by mujoco
+Xiong
 */
+
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,17 +42,17 @@ cassie_common_toolbox::cassie_proprioception_msg proprioception_msg;
 // Common Variables
 static cassie_user_in_t cassie_user_in = { 0 };
 static cassie_out_t cassie_out;
-
-static VectorXd u(10);
 static ros_utilities::Timer timeout_timer(true);
 static double tMujoco = 0;
+static bool isSimRunning = true;
 
 // Callback for controller subscriber
 void controller_callback(const cassie_common_toolbox::cassie_control_msg::ConstPtr& controlmsg) {
     timeout_timer.restart();
     for (unsigned long i = 0; i < 10; i++) {
-        u[i] = controlmsg->motor_torque[i];
+        cassie_user_in.torque[i] = controlmsg->motor_torque[i];
     }
+    // cout << "getting torques ";
 }
 
 static long long get_microseconds(void) {
@@ -92,7 +93,6 @@ int main(int argc, char* argv[]) {
     //////////////////////// Mujoco Setup /////////////////////////////////////////////////
     bool visualize = true;
     bool hold = false;
-
     ROS_INFO("Using Mujoco Simulator");
     // Create cassie simulation
     const char modelfile[] = "/home/xiaobin/cassie_ws/src/cassie_interface/model/cassie.xml";
@@ -137,18 +137,18 @@ int main(int argc, char* argv[]) {
         ros::spinOnce();
 
         // Check the timeout and see if the torque must be zeroed
-        if (timeout_timer.elapsed() > 0.01) // seconds
-        {
-            // cout << "time out: " << timeout_timer.elapsed() << endl;
-            for (unsigned long i = 0; i < 10; i++)
-                u[i] = 0.0;
+        if (isSimRunning && timeout_timer.elapsed() > 0.1) // seconds
+        { // if sim is running then check if time out for receiving torques
+            for (int i = 0; i < 10; i++)
+                cassie_user_in.torque[i] = 0;
         }
-        else {
-            control_eigen_utilities::clamp(u, -safe_torque_limit, safe_torque_limit); // Apply saturation
-        }
-        // process controller and send
-        for (unsigned int i = 0; i < 10; i++) {
-            cassie_user_in.torque[i] = u[i];
+        else { // Apply saturation
+            Eigen::Map<Eigen::VectorXd> tempU(cassie_user_in.torque, 10);
+            control_eigen_utilities::clamp(tempU, -safe_torque_limit, safe_torque_limit);
+            for (int i = 0; i < 10; i++) {
+                cassie_user_in.torque[i] = tempU[i];
+                // cout << cassie_user_in.torque[i] << " ";
+            }
         }
 
         ///////////////////////////////  receive ///////////////////////////////////
@@ -157,11 +157,12 @@ int main(int argc, char* argv[]) {
             cassie_vis_draw(vis, sim);
         // Increment loop counter
         ++loop_counter;
-        if (!cassie_vis_paused(vis))
+        isSimRunning = !cassie_vis_paused(vis);
+        if (isSimRunning)
             cassie_sim_step(sim, &cassie_out, &cassie_user_in);
 
         tMujoco = *timeMujoP;
-        cout << "MujocoTime:" << tMujoco << endl;
+        // cout << "MujocoTime:" << tMujoco << endl;
         // out << "Mujo Ros Time Diff:" << tMujo - (ros::Time::now().toSec()- tNodeStart) << endl;
         ///////////////////////////////////////////////////////
         FakeJoystickCmd();
@@ -170,6 +171,7 @@ int main(int argc, char* argv[]) {
         // Get encoder positions and pass them to robot object
         robot.q.setZero();
         robot.dq.setZero();
+        get_proprioception_torques(proprioception_msg, robot.torque);
         get_proprioception_encoders(proprioception_msg, robot.q, robot.dq);
         get_proprioception_orientation(proprioception_msg, robot.q, robot.dq, robot.quat_pelvis);
 
@@ -204,8 +206,12 @@ int main(int argc, char* argv[]) {
 
 void FakeJoystickCmd() {
     cassie_out.pelvis.radio.channel[SA] = 1.0;
-    cassie_out.pelvis.radio.channel[SB] = 0.;
-    if (tMujoco > 1) {
+    cassie_out.pelvis.radio.channel[SB] = 0.; // standing
+    cassie_out.pelvis.radio.channel[LS] = 1.0; // height 
+
+    cassie_out.pelvis.radio.channel[SH] = 1.0; // default 
+
+    if (cassie_out.pelvis.radio.channel[SB] > 0) {
         // Crouch simulation
         // cassie_out.pelvis.radio.channel[SH] = -1.0;
         //  cout << "ROS time:" << ros::Time::now().toSec() << endl;
@@ -234,6 +240,7 @@ void FakeJoystickCmd() {
 
 void processProprioception_msg() {
     // Pack and publish the proprioception data
+    proprioception_msg.isSimRunning = isSimRunning;
     proprioception_msg.orientation.w = cassie_out.pelvis.vectorNav.orientation[0];
     proprioception_msg.orientation.x = cassie_out.pelvis.vectorNav.orientation[1];
     proprioception_msg.orientation.y = cassie_out.pelvis.vectorNav.orientation[2];
