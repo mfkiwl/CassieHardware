@@ -230,7 +230,7 @@ int main(int argc, char* argv[])
 
 
         // check if NAN torques
-        for (unsigned int i = 0; i < 10; ++i) {
+        for (int i = 0; i < 10; ++i) {
             bool val = std::isnan(control_message.motor_torque[i]);
             if (val) {
                 control_message.motor_torque.fill(0.0);
